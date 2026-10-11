@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One-Time Payments</title>
+  <meta name="description" content="Lesson 10: selling add-ons and coupons with one-time orders: eligibility, verification, fulfilling exactly once, and coupon codes done right.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html" aria-current="page">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 10</p>
+      <h1>One-time payments: add-ons and coupons</h1>
+      <p class="lead">
+        Not everything is a subscription. "Unlock one more family slot for ₹1,500" or "buy one extra
+        report for ₹999" are one-time purchases. They're simpler (no mandate, no renewals), but they
+        have their own traps, mostly around delivering what was bought exactly once.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#flow">The order flow</a></li>
+          <li><a href="#states">Order states vs payment attempts</a></li>
+          <li><a href="#before">Before creating: eligibility</a></li>
+          <li><a href="#remember">Remember what was bought</a></li>
+          <li><a href="#verify">Verifying a one-time order</a></li>
+          <li><a href="#fulfil">Fulfilling exactly once</a></li>
+          <li><a href="#coupons">Coupon codes done right</a></li>
+          <li><a href="#changed">When things change between paying and delivering</a></li>
+          <li><a href="#abandoned">Failed and abandoned orders</a></li>
+          <li><a href="#edge-cases">Edge case index</a></li>
+        </ol>
+      </div>
+
+      <h2 id="flow">The order flow</h2>
+      <p>It's the same shape as a subscription (<a href="03-the-big-picture.html">Lesson 3</a>), just with an <strong>order</strong> instead of a mandate:</p>
+      <ol class="steps">
+        <li>
+          <span class="step-title">User clicks "Buy"</span>
+          <span class="step-body">Sends <em>what</em> they want (e.g. "slot 3"), never a price.</span>
+        </li>
+        <li>
+          <span class="step-title">Backend checks eligibility, then creates the order</span>
+          <span class="step-body">Calls the gateway's Create Order API with the amount from server config and a prefixed order ID like <code>slot3_42_…</code> or <code>rptc_42_…</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">Backend saves a PENDING record</span>
+          <span class="step-body">Including what was bought. Then returns the <code>payment_session_id</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">Customer pays on checkout</span>
+          <span class="step-body">UPI, card, netbanking, whatever the gateway offers.</span>
+        </li>
+        <li>
+          <span class="step-title">Return + verify, or the webhook</span>
+          <span class="step-body">Both call the <strong>same</strong> "grant if paid" function: ask the gateway (Get Order), and if paid, fulfil exactly once.</span>
+        </li>
+      </ol>
+      <div class="callout tip">
+        <span class="callout-title">Tip: one shared "grant if paid" function</span>
+        <p>Verify and the webhook should call the exact same function, e.g. <code>grantIfPaid(orderId)</code>. Two separate implementations drift apart, and one of them ends up missing a check.</p>
+      </div>
+
+      <h2 id="states">Order states vs payment attempts</h2>
+      <p>One <strong>order</strong> can have <strong>several payment attempts</strong>. The customer's UPI payment fails, they try a card, and that one succeeds.</p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 230" role="img" aria-label="One order with several payment attempts; the order becomes PAID when one succeeds, or EXPIRED if none does">
+            <defs>
+              <marker id="ah10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <rect x="20" y="95" width="160" height="50" rx="10" class="d-box accent"/>
+            <text x="100" y="117" text-anchor="middle" class="d-text">Order ACTIVE</text>
+            <text x="100" y="134" text-anchor="middle" class="d-muted">waiting for payment</text>
+
+            <rect x="250" y="30" width="180" height="40" rx="8" class="d-box bad"/>
+            <text x="340" y="55" text-anchor="middle" class="d-small">attempt 1: FAILED (UPI)</text>
+            <rect x="250" y="100" width="180" height="40" rx="8" class="d-box warn"/>
+            <text x="340" y="125" text-anchor="middle" class="d-small">attempt 2: USER_DROPPED</text>
+            <rect x="250" y="170" width="180" height="40" rx="8" class="d-box ok"/>
+            <text x="340" y="195" text-anchor="middle" class="d-small">attempt 3: SUCCESS (card)</text>
+
+            <line x1="180" y1="110" x2="248" y2="56" class="d-line" marker-end="url(#ah10)"/>
+            <line x1="180" y1="120" x2="248" y2="120" class="d-line" marker-end="url(#ah10)"/>
+            <line x1="180" y1="130" x2="248" y2="184" class="d-line" marker-end="url(#ah10)"/>
+
+            <rect x="540" y="170" width="190" height="40" rx="10" class="d-box ok"/>
+            <text x="635" y="195" text-anchor="middle" class="d-text">Order PAID → fulfil</text>
+            <line x1="430" y1="190" x2="538" y2="190" class="d-line" marker-end="url(#ah10)"/>
+
+            <rect x="540" y="30" width="190" height="40" rx="10" class="d-box bad"/>
+            <text x="635" y="55" text-anchor="middle" class="d-text">Order EXPIRED</text>
+            <path d="M100 95 V22 H635 V28" class="d-line d-dash" marker-end="url(#ah10)"/>
+            <text x="470" y="13" text-anchor="middle" class="d-muted">no successful attempt before the order's expiry time</text>
+          </svg>
+        </div>
+        <figcaption>A failed attempt is not a failed order. Only the order status (PAID / EXPIRED) is final.</figcaption>
+      </figure>
+
+      <ul>
+        <li><strong>Order status</strong> (e.g. Cashfree: <code>ACTIVE</code> → <code>PAID</code> or <code>EXPIRED</code>) is what you decide on.</li>
+        <li><strong>Payment status</strong> (<code>SUCCESS</code>, <code>FAILED</code>, <code>USER_DROPPED</code>, <code>PENDING</code>…) is per attempt. Record attempts in the ledger, but don't mark the whole order failed because one attempt failed.</li>
+        <li>To find <em>which</em> payment succeeded (for the receipt), list the order's payments and pick the one with <code>SUCCESS</code>.</li>
+        <li><strong>Set an order expiry</strong> when creating it, so unpaid orders close cleanly instead of staying open for a long default period.</li>
+      </ul>
+
+      <h2 id="before">Before creating: eligibility</h2>
+      <p>Check business rules <em>before</em> taking money. Refunding is much harder than saying no.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Purchase</th><th>Example rules</th></tr></thead>
+          <tbody>
+            <tr><td>Extra family slot</td><td>Only on the plan that offers it; only the <em>next</em> slot (3 before 4); not above the maximum.</td></tr>
+            <tr><td>Report coupon</td><td>Paid plans only; only if they don't already hold an unused coupon; only after the included monthly reports are used up.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><strong>Same protections as Lesson 6:</strong> user from the token, rate limit, per-user lock, price from server config, customer details from the database.</li>
+        <li><strong>Reuse an unpaid order</strong> for the same item if one was created minutes ago, instead of creating a pile of them.</li>
+        <li><strong>If an eligibility check itself errors</strong> (e.g. a database query fails), decide deliberately. For purchases, "fail closed" (don't sell) is usually safer than "skip the check".</li>
+      </ul>
+
+      <h2 id="remember">Remember what was bought</h2>
+      <p>
+        When the payment succeeds, possibly minutes later via a webhook, you must know <em>exactly</em>
+        what to deliver. Store it on the pending record at creation time:
+      </p>
+      <ul>
+        <li>The item type and details: "family slot, target = 3" or "report coupon, valid 3 months".</li>
+        <li>The <strong>amount and currency</strong> you charged.</li>
+        <li>The user it's for.</li>
+      </ul>
+      <p>Use proper columns (e.g. <code>item_type</code>, <code>item_value</code>), not text tucked into an unrelated field that has to be parsed back out later. Never rely on the client to tell you again what they bought.</p>
+
+      <h2 id="verify">Verifying a one-time order</h2>
+      <p>Before fulfilling, check all of these:</p>
+      <ul class="checklist">
+        <li>The order exists in <strong>your</strong> records (and belongs to this user, if called from verify)</li>
+        <li>The gateway says the order is <strong><code>PAID</code></strong> (Get Order), not just "a payment succeeded" in a webhook payload</li>
+        <li>The <strong>paid amount and currency equal</strong> what you stored for this order</li>
+        <li>It hasn't already been fulfilled (it's fine if it has: just return the earlier result)</li>
+      </ul>
+      <p>If it's not paid yet: reply "pending", change nothing (same rule as <a href="07-verifying-a-payment.html#final">Lesson 7</a>).</p>
+
+      <h2 id="fulfil">Fulfilling exactly once</h2>
+      <p>Verify and the webhook can both reach "fulfil" at the same moment. There are two kinds of things you deliver, and each has a natural way to stay safe:</p>
+
+      <div class="split">
+        <div>
+          <h4>Kind 1: change an entitlement</h4>
+          <p><em>Family slots, credits, feature unlocks.</em></p>
+          <p>❌ <code>slots = slots + 1</code>: run twice, you get two slots.</p>
+          <p>✅ <code>slots = max(slots, 3)</code>: run twice, still 3.</p>
+          <p>Write it as "make sure it's at least X", which is naturally safe to repeat.</p>
+        </div>
+        <div>
+          <h4>Kind 2: issue a new item</h4>
+          <p><em>Coupons, vouchers, licence keys.</em></p>
+          <p>Each order must produce exactly one item. Put a <strong>UNIQUE constraint on <code>orderId</code></strong> in the items table.</p>
+          <p>The second attempt's insert fails with "duplicate order", so fetch and return the item that already exists.</p>
+        </div>
+      </div>
+
+      <p>Then mark the order fulfilled with a conditional update ("set SUCCESS where not already SUCCESS"). Ideally the item insert and the status update happen in <strong>one transaction</strong>, so you can never end up "paid and marked done, but no coupon".</p>
+
+      <div class="callout edge">
+        <span class="callout-title">Edge case: two different "duplicate" errors</span>
+        <p>
+          When inserting a coupon, a duplicate error can mean two very different things. The
+          <strong>code</strong> collided with an existing code: generate a new code and try again. Or
+          the <strong>order already has a coupon</strong>: stop and return the existing one. If your
+          retry loop treats both the same, it either issues two coupons for one order, or retries until
+          it gives up and tells a paying customer "something went wrong". Check which constraint failed.
+        </p>
+      </div>
+
+      <h2 id="coupons">Coupon codes done right</h2>
+      <h3>Generating</h3>
+      <ul>
+        <li><strong>Secure randomness.</strong> Use the crypto library (<code>crypto.randomInt</code> / <code>randomBytes</code>), not <code>Math.random()</code>, whose output can be predicted.</li>
+        <li><strong>Long enough to be unguessable.</strong> 5 letters gives a few hundred million combinations, which is fine for codes tied to one owner but thin for codes anyone can redeem. 8–12 characters is a comfortable default.</li>
+        <li><strong>Easy to read and type.</strong> Leave out look-alikes (<code>0 O</code>, <code>1 l I</code>). Uppercase only avoids case confusion, e.g. <code>RPT-7K4M-Q9XH</code>.</li>
+        <li><strong>UNIQUE on the code column</strong>, with a retry on collision.</li>
+      </ul>
+      <h3>Owning and redeeming</h3>
+      <ul>
+        <li><strong>Owned coupons</strong> (bought by a user) store that user's ID. Only they can redeem them.</li>
+        <li><strong>Promo coupons</strong> (no owner) need stronger codes and maybe per-user limits.</li>
+        <li><strong>Expiry</strong> is stored on the coupon and checked at redemption.</li>
+        <li><strong>Redeem atomically:</strong> <code>UPDATE coupons SET used = 1 WHERE code = ? AND used = 0 AND (owner IS NULL OR owner = ?) AND expires_at &gt; NOW()</code>. Continue only if 1 row changed. Checking "is it used?" and then marking it used in a separate step lets two quick clicks use one coupon twice.</li>
+        <li><strong>If the thing the coupon pays for fails</strong> (e.g. report generation crashes), decide whether the coupon is returned. Usually yes: mark it unused again, or mark it used only when the work succeeds.</li>
+      </ul>
+
+      <h2 id="changed">When things change between paying and delivering</h2>
+      <p>Eligibility was checked at order creation. By the time the payment lands, things may have changed:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>What changed</th><th>Example</th><th>Sensible handling</th></tr></thead>
+          <tbody>
+            <tr><td>Plan changed</td><td>Bought a Starter-only slot, then upgraded or expired before paying</td><td>Honour it (the payment is real), or refund automatically. Never silently keep the money.</td></tr>
+            <tr><td>Bought twice</td><td>Two tabs, both paid for "slot 3"</td><td>The second can't be fulfilled meaningfully → refund it, or convert it to the next item.</td></tr>
+            <tr><td>Already holds an unused coupon</td><td>Two coupon orders paid in parallel</td><td>Issue both (they paid for two) or refund one. Pick a policy and log it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="keyidea">Once money is taken, either deliver what was paid for or give it back, and log which.</p>
+
+      <h2 id="abandoned">Failed and abandoned orders</h2>
+      <ul>
+        <li><strong>Pending ledger rows</strong> are created for every order. Many will never be paid. That's normal.</li>
+        <li><strong>Failed / dropped webhooks</strong> update the attempt in the ledger (with the reason) without failing the order.</li>
+        <li><strong>A cleanup job</strong> marks orders past their expiry as <code>EXPIRED</code>, so "pending" doesn't mean "forever unknown".</li>
+        <li><strong>Reporting:</strong> paid vs expired orders shows how many people start and don't finish, and where they drop off.</li>
+      </ul>
+
+      <h2 id="edge-cases">Edge case index</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Edge case</th><th>Handled by</th></tr></thead>
+          <tbody>
+            <tr><td>Client sends a lower price</td><td>Amount from server config</td></tr>
+            <tr><td>Buying an item they're not eligible for</td><td>Eligibility before creating the order</td></tr>
+            <tr><td>Paid amount ≠ order amount</td><td>Compare before fulfilling</td></tr>
+            <tr><td>First attempt fails, second succeeds</td><td>Decide on order status, not attempt status</td></tr>
+            <tr><td>Verify and webhook fulfil together</td><td>Idempotent entitlement / UNIQUE orderId on items</td></tr>
+            <tr><td>Coupon code collides</td><td>UNIQUE code + regenerate</td></tr>
+            <tr><td>Order already has a coupon</td><td>Return the existing one</td></tr>
+            <tr><td>Guessable coupon codes</td><td>Crypto randomness, enough length</td></tr>
+            <tr><td>One coupon used twice by fast clicks</td><td>Atomic redeem update</td></tr>
+            <tr><td>Eligibility changed after paying</td><td>Honour or refund; never keep silently</td></tr>
+            <tr><td>Orders that are never paid</td><td>Order expiry + cleanup job</td></tr>
+            <tr><td>Webhook for an order you never saved</td><td>Log + 200</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="callout-title">Where this chapter goes next</span>
+        <p>Refunds and disputes (giving money back, and customers pulling it back through their bank), and reconciliation (making sure your records, the gateway and your bank all agree).</p>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="09-renewals-and-cancellations.html"><small>← Previous</small><span>Renewals, failures and cancellations</span></a>
+        <a class="next" href="11-interview-questions.html"><small>Next →</small><span>Interview questions &amp; answers</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

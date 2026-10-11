@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Creating an Order Safely</title>
+  <meta name="description" content="Lesson 6: a production checklist for creating an order or subscription: locks, duplicates, pricing, validation, failures and observability.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html" aria-current="page">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 6</p>
+      <h1>Creating an order, safely</h1>
+      <p class="lead">
+        "Create order" is the first server-side step of every payment, and the one that has to
+        work for millions of clicks without ever creating duplicates, charging the wrong price or
+        leaving the customer stuck. This lesson walks through a complete, production-grade design.
+      </p>
+
+      <div class="callout">
+        <span class="callout-title">Order or subscription?</span>
+        <p>
+          Everything here applies to both. One-time payments call it an <strong>order</strong>;
+          recurring ones call it a <strong>subscription</strong>. The steps are the same; a
+          subscription just has a plan and a mandate attached.
+        </p>
+      </div>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#pipeline">The 12 steps at a glance</a></li>
+          <li><a href="#price">Price comes from the server</a></li>
+          <li><a href="#duplicates">Stopping duplicates: locks</a></li>
+          <li><a href="#eligibility">Eligibility: should this user subscribe now?</a></li>
+          <li><a href="#customer">Customer details</a></li>
+          <li><a href="#request">Building the request</a></li>
+          <li><a href="#call">Calling the gateway</a></li>
+          <li><a href="#save">Save first, then reply</a></li>
+          <li><a href="#failures">What if it fails at each step?</a></li>
+          <li><a href="#respond">Responding to the frontend</a></li>
+          <li><a href="#observe">Observability</a></li>
+          <li><a href="#edge-cases">Edge case index</a></li>
+          <li><a href="#checklist">Go-live checklist</a></li>
+        </ol>
+      </div>
+
+      <h2 id="pipeline">The 12 steps at a glance</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Authenticate</span>
+          <span class="step-body">Know who the user is from their login token, never from a <code>userId</code> in the request body.</span>
+        </li>
+        <li>
+          <span class="step-title">Rate-limit</span>
+          <span class="step-body">A few creates per user per few minutes. Protects your account-wide gateway limit.</span>
+        </li>
+        <li>
+          <span class="step-title">Validate the plan, look up the price</span>
+          <span class="step-body">The client sends only a plan key. The price comes from server config.</span>
+        </li>
+        <li>
+          <span class="step-title">Take a per-user lock</span>
+          <span class="step-body">So two clicks or two tabs can't both get through steps 5–10 at the same time.</span>
+        </li>
+        <li>
+          <span class="step-title">Check eligibility</span>
+          <span class="step-body">Already subscribed? Recent unfinished checkout to reuse? Trial user?</span>
+        </li>
+        <li>
+          <span class="step-title">Prepare customer details</span>
+          <span class="step-body">From your database. Normalise the phone, check email and name.</span>
+        </li>
+        <li>
+          <span class="step-title">Build the request</span>
+          <span class="step-body">Your unique ID, return URL from config, session expiry, auth amount, first charge time, tags.</span>
+        </li>
+        <li>
+          <span class="step-title">Call the gateway</span>
+          <span class="step-body">Through the shared client: timeout, idempotency key, safe retry.</span>
+        </li>
+        <li>
+          <span class="step-title">Validate the response</span>
+          <span class="step-body">Session ID, gateway ID and status must all be present.</span>
+        </li>
+        <li>
+          <span class="step-title">Save the pending record</span>
+          <span class="step-body">Before replying. Store your ID, the gateway's ID, session ID, plan, amount and status.</span>
+        </li>
+        <li>
+          <span class="step-title">Release the lock and respond</span>
+          <span class="step-body">Send only what the frontend needs. Map errors to friendly messages.</span>
+        </li>
+        <li>
+          <span class="step-title">Log and measure</span>
+          <span class="step-body">One structured log line, plus metrics and alerts.</span>
+        </li>
+      </ol>
+      <p>The rest of the lesson explains the steps that need real thought.</p>
+
+      <h2 id="price">Price comes from the server</h2>
+      <p>
+        The frontend sends <code>{ planType: "STARTER_MONTHLY" }</code>, never
+        <code>{ amount: 499 }</code>. If you accept an amount from the browser, someone will send
+        <code>amount: 1</code>.
+      </p>
+      <ul>
+        <li><strong>Look up the plan in server config.</strong> Reject unknown keys with a clear 400.</li>
+        <li><strong>Check that the plan can be bought this way</strong> (e.g. monthly subscriptions only).</li>
+        <li><strong>One source of truth.</strong> The amount you store must equal the amount the gateway charges. Build the plan inline from your config, or check on startup that the gateway's plan amounts match.</li>
+        <li><strong>Store money safely:</strong> <code>DECIMAL</code> or integer paise, never floats, plus the currency.</li>
+      </ul>
+      <div class="callout edge">
+        <span class="callout-title">Edge case: test prices in production</span>
+        <p>₹1 plans are handy in sandbox and a disaster in production. Make "prices match the real price list" a go-live checklist item, or fail startup if production config has suspicious amounts.</p>
+      </div>
+
+      <h2 id="duplicates">Stopping duplicates: locks</h2>
+      <p>
+        "Check if the user already has a pending subscription, and if not, create one" sounds safe.
+        It isn't, when two requests arrive together: a double-click, two open tabs, or a retry from a
+        flaky network.
+      </p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 390" role="img" aria-label="Without a lock both requests create a subscription; with a lock the second waits and reuses the first">
+            <defs>
+              <marker id="ah6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <text x="10" y="22" class="d-text d-label-bad">Without a lock</text>
+            <text x="10" y="64" class="d-small">Tab 1</text>
+            <text x="10" y="124" class="d-small">Tab 2</text>
+
+            <rect x="80" y="44" width="150" height="32" rx="6" class="d-box"/>
+            <text x="155" y="65" text-anchor="middle" class="d-small">check: none pending ✓</text>
+            <rect x="245" y="44" width="170" height="32" rx="6" class="d-box"/>
+            <text x="330" y="65" text-anchor="middle" class="d-small">create sub_A at gateway</text>
+            <rect x="430" y="44" width="110" height="32" rx="6" class="d-box"/>
+            <text x="485" y="65" text-anchor="middle" class="d-small">save sub_A</text>
+
+            <rect x="110" y="104" width="150" height="32" rx="6" class="d-box"/>
+            <text x="185" y="125" text-anchor="middle" class="d-small">check: none pending ✓</text>
+            <rect x="275" y="104" width="170" height="32" rx="6" class="d-box"/>
+            <text x="360" y="125" text-anchor="middle" class="d-small">create sub_B at gateway</text>
+            <rect x="460" y="104" width="110" height="32" rx="6" class="d-box"/>
+            <text x="515" y="125" text-anchor="middle" class="d-small">save sub_B</text>
+
+            <rect x="595" y="56" width="155" height="68" rx="8" class="d-box bad"/>
+            <text x="672" y="82" text-anchor="middle" class="d-text d-label-bad">2 subscriptions</text>
+            <text x="672" y="102" text-anchor="middle" class="d-muted">pay both → billed twice</text>
+
+            <line x1="80" y1="162" x2="575" y2="162" class="d-line" marker-end="url(#ah6)"/>
+            <text x="580" y="166" class="d-muted">time</text>
+
+            <line x1="10" y1="190" x2="750" y2="190" class="d-life"/>
+
+            <text x="10" y="222" class="d-text d-label-ok">With a per-user lock</text>
+            <text x="10" y="264" class="d-small">Tab 1</text>
+            <text x="10" y="324" class="d-small">Tab 2</text>
+
+            <rect x="80" y="244" width="150" height="32" rx="6" class="d-box accent"/>
+            <text x="155" y="265" text-anchor="middle" class="d-small">lock · check: none ✓</text>
+            <rect x="245" y="244" width="170" height="32" rx="6" class="d-box"/>
+            <text x="330" y="265" text-anchor="middle" class="d-small">create sub_A at gateway</text>
+            <rect x="430" y="244" width="110" height="32" rx="6" class="d-box accent"/>
+            <text x="485" y="265" text-anchor="middle" class="d-small">save · unlock</text>
+
+            <rect x="110" y="304" width="430" height="32" rx="6" class="d-box d-dash"/>
+            <text x="325" y="325" text-anchor="middle" class="d-muted">waiting for the lock…</text>
+            <rect x="550" y="304" width="200" height="32" rx="6" class="d-box ok"/>
+            <text x="650" y="325" text-anchor="middle" class="d-small">sees sub_A → reuse its session</text>
+
+            <line x1="80" y1="362" x2="575" y2="362" class="d-line" marker-end="url(#ah6)"/>
+            <text x="580" y="366" class="d-muted">time</text>
+          </svg>
+        </div>
+        <figcaption>The bug is the gap between "check" and "act". A lock makes check → create → save one uninterrupted unit per user.</figcaption>
+      </figure>
+
+      <h3>How to lock (context)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Option</th><th>How it works</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Database named lock</strong></td><td>MySQL <code>GET_LOCK('sub_create_42', 5)</code> … <code>RELEASE_LOCK(…)</code>. Only one connection can hold that name at a time.</td><td>No extra infrastructure. Released automatically if the connection dies. Use the same connection for get and release.</td></tr>
+            <tr><td><strong>Redis lock</strong></td><td><code>SET lock:sub:42 &lt;token&gt; NX PX 30000</code>: set only if it doesn't exist, with expiry.</td><td>Works across many servers. The expiry (TTL) frees it if a server crashes.</td></tr>
+            <tr><td><strong>Unique constraint</strong></td><td>The database refuses a second "pending" row for the same user.</td><td>The strongest final safety net. Combine with a lock for a clean user experience.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><strong>Lock per user, not globally.</strong> Different users never wait for each other.</li>
+        <li><strong>Always release</strong> in a <code>finally</code> block, and always have a timeout or TTL so a crash can't hold it forever.</li>
+        <li><strong>Holding it during the gateway call is fine.</strong> It's per user, and the whole point is to cover check → create → save.</li>
+        <li><strong>If the lock is busy</strong>, wait a few seconds, then either continue (and likely reuse the pending one) or answer "already in progress".</li>
+      </ul>
+
+      <h2 id="eligibility">Eligibility: should this user subscribe now?</h2>
+      <p>Inside the lock, decide what to do based on the user's current state:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>User's situation</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td>No subscription</td><td>Create a new one.</td></tr>
+            <tr><td>Already has an <strong>active paid</strong> subscription</td><td>Reject: "You're already subscribed." Plan changes need their own upgrade or downgrade flow, never a second mandate.</td></tr>
+            <tr><td><strong>Pending</strong> one for the same plan, session still valid</td><td>Return the <em>same</em> session ID. To the user this feels like "it just worked"; no new subscription.</td></tr>
+            <tr><td>Pending one for a <em>different</em> plan</td><td>Create a new one; the old one expires unused. (Optionally cancel the old one.)</td></tr>
+            <tr><td>On a free trial</td><td>Allow. Decide whether paid access starts now or when the trial ends.</td></tr>
+            <tr><td>Cancelled but paid period not over</td><td>Allow, but decide the start date so they don't pay twice for the same days.</td></tr>
+            <tr><td>Has access through someone else (e.g. family plan)</td><td>Product decision: allow or explain why it isn't needed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout tip">
+        <span class="callout-title">Tip: reuse needs the session saved</span>
+        <p>To reuse a pending checkout, you must store its session ID and creation time (step 10), and know when sessions expire (step 7).</p>
+      </div>
+
+      <h2 id="customer">Customer details</h2>
+      <p>The gateway needs name, email and phone for the checkout page and for pre-debit notifications.</p>
+      <ul>
+        <li><strong>Take them from your database</strong>, not from the request body. Otherwise a client can register any phone or email on the mandate, and notifications go to the wrong person.</li>
+        <li><strong>Validate before calling the gateway</strong>, so the user gets a clear message instead of a vague provider error.</li>
+      </ul>
+      <h3>Phone normalisation (India)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Stored as</th><th>Becomes</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td><code>+91 98765 43210</code></td><td><code>9876543210</code></td><td>Remove non-digits, drop the leading <code>91</code> from 12 digits</td></tr>
+            <tr><td><code>09876543210</code></td><td><code>9876543210</code></td><td>Drop the leading <code>0</code> from 11 digits</td></tr>
+            <tr><td><code>0919876543210</code></td><td><code>9876543210</code></td><td>Drop <code>091</code> from 13 digits</td></tr>
+            <tr><td><code>12345</code></td><td class="no">Reject</td><td>Final check: exactly 10 digits, starting with 6–9</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Also trim names, respect the gateway's length limits, and do a basic email format check.</p>
+
+      <h2 id="request">Building the request</h2>
+
+      <h3>Your unique ID</h3>
+      <p>Example: <code>sub_42_1717171717123_9f3a</code></p>
+      <ul>
+        <li><strong>A prefix</strong> (<code>sub_</code>, <code>slot_</code>, <code>coupon_</code>) tells you what kind of payment it is when it shows up in a webhook or log.</li>
+        <li><strong>User ID + timestamp</strong> make it readable and roughly sortable.</li>
+        <li><strong>A random suffix</strong> prevents two requests in the same millisecond getting the same ID.</li>
+        <li><strong>Respect the gateway's rules:</strong> allowed characters (letters, digits, <code>_ - .</code>) and maximum length.</li>
+      </ul>
+
+      <h3>Return URL</h3>
+      <ul>
+        <li>Built from a <strong>configured base URL</strong> (<code>API_BASE_URL=https://api.yourapp.com</code>), never from the incoming request's host or protocol.</li>
+        <li><strong>Always https.</strong></li>
+        <li>Includes your order ID, so the return handler knows what to verify. Nothing secret.</li>
+      </ul>
+
+      <h3>Session expiry</h3>
+      <p>Set it explicitly (e.g. 30 minutes). Short-lived checkout links mean abandoned subscriptions expire quickly, and they give a clear rule for "is this pending one still reusable?".</p>
+
+      <h3>Auth amount and first charge time</h3>
+      <p>Decide them together so month 1 is charged exactly once for every payment method, including eNACH. See <a href="02-one-time-vs-recurring.html#first-month">the first-month trap</a>.</p>
+
+      <h3>The rest</h3>
+      <ul>
+        <li><strong>Payment methods:</strong> only the ones you've tested (e.g. UPI, card, eNACH).</li>
+        <li><strong>Notification channels:</strong> SMS and/or email for pre-debit notices.</li>
+        <li><strong>Tags:</strong> user ID, plan key, environment. They come back in webhooks and help with debugging.</li>
+        <li><strong>Plan:</strong> a <code>plan_id</code> created once per environment, or the plan inline from your config. Inline keeps the price in one place.</li>
+      </ul>
+
+      <h2 id="call">Calling the gateway</h2>
+      <p>This step is short because Lessons 4 and 5 did the work:</p>
+      <ul>
+        <li>Go through the <strong>shared gateway client</strong>: config-driven URL and keys, version header, keep-alive, one error mapper.</li>
+        <li><strong>Timeout</strong> on the call (10–15 s).</li>
+        <li><strong>One idempotency key per create attempt</strong>, reused only if you retry that same request.</li>
+        <li><strong>Retry only</strong> timeouts, network errors and 5xx, once or twice with a short backoff. Never 4xx.</li>
+        <li>Send an <strong><code>x-request-id</code></strong> (e.g. your order ID) so support can find the call.</li>
+      </ul>
+
+      <h3>Validate the response</h3>
+      <p>A 200 isn't enough. Check that the body has everything you need:</p>
+      <ul>
+        <li>session ID (to open checkout)</li>
+        <li>the gateway's subscription ID (to match webhooks later)</li>
+        <li>a status, normally <code>INITIALIZED</code></li>
+      </ul>
+      <p>If anything is missing, treat it as a provider failure: log the full body, return a friendly error, don't save a half-record.</p>
+
+      <h2 id="save">Save first, then reply</h2>
+      <p class="keyidea">
+        Never give the customer a way to pay for something your database doesn't know about.
+      </p>
+      <p>
+        The order is: gateway creates → <strong>you save</strong> → you send the session ID. If the
+        save fails, you don't send the session ID. The customer can't pay, and the subscription at
+        the gateway just expires unused. If you replied first and saved second, a failed save would
+        leave a paid subscription with no record. Then your webhooks find nothing, and the customer
+        paid for nothing.
+      </p>
+      <p>Save: your ID, the gateway's ID, user, plan, amount, currency, session ID, session expiry, status (<code>PENDING</code> plus the raw gateway status), and timestamps.</p>
+
+      <h2 id="failures">What if it fails at each step?</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fails at</th><th>At the gateway</th><th>In your DB</th><th>Customer sees</th><th>Harm?</th></tr></thead>
+          <tbody>
+            <tr><td>Validation, rate limit, eligibility</td><td>Nothing</td><td>Nothing</td><td>Clear message</td><td class="yes">None</td></tr>
+            <tr><td>Gateway times out, retry succeeds</td><td>Created once</td><td>Saved</td><td>Normal checkout</td><td class="yes">None (idempotency)</td></tr>
+            <tr><td>Gateway returns 4xx/5xx</td><td>Nothing</td><td>Nothing</td><td>"Provider issue, try again"</td><td class="yes">None; alert on 401/404</td></tr>
+            <tr><td>Response is missing fields</td><td>Maybe created</td><td>Nothing</td><td>"Try again"</td><td class="yes">Orphan expires</td></tr>
+            <tr><td>Database save fails</td><td>Created</td><td>Nothing</td><td>"Try again"</td><td class="yes">Orphan expires; customer never had its session</td></tr>
+            <tr><td>Server crashes after save, before reply</td><td>Created</td><td>Pending</td><td>Error or spinner</td><td class="yes">None; next click reuses the pending one</td></tr>
+            <tr><td>Customer abandons checkout</td><td><code>INITIALIZED</code> → <code>LINK_EXPIRED</code></td><td>Pending</td><td>—</td><td class="yes">None; mark expired via webhook or cleanup job</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Every row ends with "no harm". That's the goal of this design.</p>
+
+      <h2 id="respond">Responding to the frontend</h2>
+      <ul>
+        <li><strong>Success:</strong> only the session ID, the mode (sandbox or production, so the SDK opens the right checkout), and your order ID.</li>
+        <li><strong>User-fixable errors (400):</strong> a specific message, e.g. "Please add a valid mobile number to your profile."</li>
+        <li><strong>Provider or setup errors:</strong> 502 (or 503 for rate limits) with a generic "payment provider issue" message. Never pass the gateway's 401 through.</li>
+        <li><strong>Never leak internals:</strong> no SQL errors, stack traces or raw gateway bodies.</li>
+        <li><strong>Frontend side:</strong> disable the button while the request runs, so a double-click is stopped before it even reaches the server lock.</li>
+      </ul>
+
+      <h2 id="observe">Observability</h2>
+      <h3>One log line per create</h3>
+      <pre><code>event=subscription_create  user=42  order=sub_42_…_9f3a  cf_id=4567
+plan=STARTER_MONTHLY  outcome=created|reused|rejected|provider_error
+http=200  latency_ms=840  request_id=…</code></pre>
+      <h3>Metrics worth watching</h3>
+      <ul>
+        <li>Creates per minute, and the split between created, reused and rejected</li>
+        <li>Gateway latency (p95) and error rate by status code</li>
+        <li>429 count (are you near the rate limit?)</li>
+        <li>Checkout conversion: created vs actually activated</li>
+      </ul>
+      <h3>Alerts</h3>
+      <ul>
+        <li>Any burst of 401 or 404 from the gateway: config is broken for everyone</li>
+        <li>Error rate above normal for several minutes</li>
+        <li>Database save failures after a successful gateway create</li>
+      </ul>
+
+      <h2 id="edge-cases">Edge case index</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Edge case</th><th>Handled by</th></tr></thead>
+          <tbody>
+            <tr><td>Client sends someone else's user ID</td><td>Step 1: user only from token</td></tr>
+            <tr><td>Bot or user spamming create</td><td>Step 2: rate limit + reuse pending</td></tr>
+            <tr><td>Client sends a fake price</td><td>Step 3: price from server config</td></tr>
+            <tr><td>Double-click / two tabs</td><td>Button disabled + step 4 lock + unique constraint</td></tr>
+            <tr><td>Already subscribed user creates another</td><td>Step 5: eligibility</td></tr>
+            <tr><td>User comes back to an unfinished checkout</td><td>Step 5: reuse pending session</td></tr>
+            <tr><td>Wrong phone or email on the mandate</td><td>Step 6: details from DB</td></tr>
+            <tr><td>Phone stored with +91 / 0 / spaces</td><td>Step 6: normalisation</td></tr>
+            <tr><td>Two IDs in the same millisecond</td><td>Step 7: random suffix</td></tr>
+            <tr><td>Return URL is http or an internal host</td><td>Step 7: base URL from config</td></tr>
+            <tr><td>Abandoned checkouts piling up</td><td>Step 7: short session expiry</td></tr>
+            <tr><td>Month 1 charged twice or not at all</td><td>Step 7: auth amount + first charge decided together</td></tr>
+            <tr><td>Timeout after the gateway created it</td><td>Step 8: retry with same idempotency key</td></tr>
+            <tr><td>Gateway keys wrong or plan missing</td><td>Step 8: mapped to 502 + alert</td></tr>
+            <tr><td>Partial / malformed response</td><td>Step 9: validate body</td></tr>
+            <tr><td>Database down after gateway success</td><td>Step 10: no session sent; orphan expires</td></tr>
+            <tr><td>Price in DB ≠ price charged</td><td>Step 3: one source of truth</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="checklist">Go-live checklist</h2>
+      <ul class="checklist">
+        <li>Production plans exist, and their prices match the real price list</li>
+        <li>No test prices (₹1) left in production config</li>
+        <li>Live keys, production base URL and environment name all switch together</li>
+        <li>Return URL uses the production https domain</li>
+        <li>Webhook URL configured in the production dashboard</li>
+        <li>Session expiry, rate limit and per-user lock enabled</li>
+        <li>Double-click and two-tab test: only one subscription created</li>
+        <li>Each payment method tested in sandbox (UPI, card, eNACH), checking exactly when month 1 is charged</li>
+        <li>Abandoned checkout tested: no access change, pending row expires</li>
+        <li>Mobile app tested on a real device: user ends up back in the app</li>
+        <li>Alerts for gateway 401/404 and save failures</li>
+        <li>Logs mask phone and email; no secrets anywhere in logs</li>
+      </ul>
+
+      <div class="callout">
+        <span class="callout-title">What comes after this</span>
+        <p>
+          Creating the order only <em>starts</em> the payment. The next lessons, verifying the result
+          and handling webhooks, are where access is actually granted. They need the same "exactly
+          once, no matter what" thinking.
+        </p>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="05-idempotency.html"><small>← Previous</small><span>Idempotency</span></a>
+        <a class="next" href="07-verifying-a-payment.html"><small>Next →</small><span>Verifying a payment</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

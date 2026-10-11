@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payment Gateway Integration</title>
+  <meta name="description" content="Chapter 1: how online payments work and how to integrate a payment gateway properly.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ Payment Gateway Integration</span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html" aria-current="page">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Chapter 1</p>
+      <h1>Payment Gateway Integration</h1>
+      <p class="lead">
+        Taking money online looks like one button. Behind it are banks, card networks,
+        a gateway, your server, the customer's browser and a lot of things that can
+        go wrong in between. This chapter builds the full mental model, then goes deep
+        on every stage: creating an order safely, verifying it, handling webhooks,
+        living with renewals and cancellations, and selling one-time add-ons.
+      </p>
+
+      <div class="callout">
+        <span class="callout-title">What this chapter is (and isn't)</span>
+        <p>
+          It's about <strong>ideas that apply to any payment integration</strong>: what each
+          piece does, why it's designed that way, and every edge case worth knowing. It isn't a
+          copy of one project's code. Examples use Indian payment methods and Cashfree's API names
+          because that's where I learned it, but Razorpay, Stripe and others work the same way.
+        </p>
+      </div>
+
+      <h2>Lessons</h2>
+      <div class="cards">
+        <a class="card" href="01-what-is-a-payment-gateway.html">
+          <span class="card-num">Lesson 1</span>
+          <span class="card-title">What is a payment gateway?</span>
+          <span class="card-desc">The players (you, the gateway, banks, networks), how approval and money move, payment methods in India, and why hosted checkout exists.</span>
+        </a>
+        <a class="card" href="02-one-time-vs-recurring.html">
+          <span class="card-num">Lesson 2</span>
+          <span class="card-title">One-time vs recurring payments</span>
+          <span class="card-desc">Orders vs subscriptions, mandates (UPI AutoPay, cards, eNACH), plans, the subscription lifecycle and the first-month trap.</span>
+        </a>
+        <a class="card" href="03-the-big-picture.html">
+          <span class="card-num">Lesson 3</span>
+          <span class="card-title">The end-to-end flow</span>
+          <span class="card-desc">From "Subscribe" click to access granted: create, checkout, return URL, verify and webhooks, and why there are two paths.</span>
+        </a>
+        <a class="card" href="04-talking-to-the-gateway-api.html">
+          <span class="card-num">Lesson 4</span>
+          <span class="card-title">Talking to the gateway API</span>
+          <span class="card-desc">Keys and headers, environments, HTTP status codes, timeouts, retries, rate limits and a shared API client.</span>
+        </a>
+        <a class="card" href="05-idempotency.html">
+          <span class="card-num">Lesson 5</span>
+          <span class="card-title">Idempotency</span>
+          <span class="card-desc">The lost-response problem, idempotency keys vs unique IDs, how it works inside, and when it really matters.</span>
+        </a>
+        <a class="card" href="06-creating-an-order.html">
+          <span class="card-num">Lesson 6</span>
+          <span class="card-title">Creating an order, safely</span>
+          <span class="card-desc">A 12-step production checklist: locks, duplicates, pricing, validation, failure handling and observability.</span>
+        </a>
+        <a class="card" href="07-verifying-a-payment.html">
+          <span class="card-num">Lesson 7</span>
+          <span class="card-title">Verifying a payment</span>
+          <span class="card-desc">The return handler, final vs not-final statuses, "still in progress" UX, and granting access exactly once.</span>
+        </a>
+        <a class="card" href="08-webhooks.html">
+          <span class="card-num">Lesson 8</span>
+          <span class="card-title">Webhooks</span>
+          <span class="card-desc">Signatures, the inbox table, replying fast, duplicates and out-of-order delivery, and an event cheat sheet.</span>
+        </a>
+        <a class="card" href="09-renewals-and-cancellations.html">
+          <span class="card-num">Lesson 9</span>
+          <span class="card-title">Renewals, failures and cancellations</span>
+          <span class="card-desc">Paid-until, one payment = one period, failed charges, cancelling from both sides, and turning access off.</span>
+        </a>
+        <a class="card" href="10-one-time-payments.html">
+          <span class="card-num">Lesson 10</span>
+          <span class="card-title">One-time payments: add-ons and coupons</span>
+          <span class="card-desc">Orders vs attempts, eligibility, fulfilling exactly once, and coupon codes done right.</span>
+        </a>
+        <a class="card" href="11-interview-questions.html">
+          <span class="card-num">Lesson 11</span>
+          <span class="card-title">Interview questions &amp; answers</span>
+          <span class="card-desc">Basics to deep design, debugging scenarios and "tell me about your project", with answers to say out loud.</span>
+        </a>
+      </div>
+
+      <h2>Coming next</h2>
+      <p>Topics this chapter will grow into:</p>
+      <div class="cards">
+        <div class="card upcoming">
+          <span class="card-num">Later</span>
+          <span class="card-title">Refunds and disputes</span>
+          <span class="card-desc">Full and partial refunds, refund webhooks, chargebacks and how to respond.</span>
+        </div>
+        <div class="card upcoming">
+          <span class="card-num">Later</span>
+          <span class="card-title">Reconciliation</span>
+          <span class="card-desc">Making sure your database, the gateway and your bank all agree.</span>
+        </div>
+      </div>
+
+      <h2>Glossary</h2>
+      <p>Come back here whenever a term is unfamiliar.</p>
+      <dl class="glossary">
+        <dt>Merchant</dt>
+        <dd>The business accepting the money. That's you.</dd>
+
+        <dt>Payment gateway</dt>
+        <dd>The technology that securely takes payment details from the customer and passes them to the banking system.</dd>
+
+        <dt>Payment aggregator</dt>
+        <dd>A gateway that also collects the money on your behalf and settles it to your bank account. Cashfree, Razorpay and PayU are aggregators. In India they're licensed by the RBI.</dd>
+
+        <dt>Issuing bank (issuer)</dt>
+        <dd>The customer's bank: the one that issued their card or holds their account.</dd>
+
+        <dt>Acquiring bank (acquirer)</dt>
+        <dd>The bank that receives payments on the merchant's side. With an aggregator you usually don't deal with it directly.</dd>
+
+        <dt>Card network</dt>
+        <dd>Visa, Mastercard, RuPay, Amex. They route card payments between acquirer and issuer.</dd>
+
+        <dt>NPCI</dt>
+        <dd>National Payments Corporation of India. It runs UPI, NACH and RuPay.</dd>
+
+        <dt>Mandate</dt>
+        <dd>The customer's standing permission for you to debit them again later without them being present. Needed for subscriptions.</dd>
+
+        <dt>UPI AutoPay</dt>
+        <dd>A mandate set up in a UPI app with the UPI PIN.</dd>
+
+        <dt>eNACH</dt>
+        <dd>An electronic mandate on a bank account, approved via netbanking, debit card or Aadhaar.</dd>
+
+        <dt>Plan</dt>
+        <dd>The template for a subscription: price, how often to charge and limits.</dd>
+
+        <dt>Order</dt>
+        <dd>A one-time payment request for a fixed amount.</dd>
+
+        <dt>Subscription</dt>
+        <dd>A recurring payment arrangement for one customer on one plan, backed by a mandate.</dd>
+
+        <dt>Session ID</dt>
+        <dd>A short-lived token the gateway gives you when you create an order or subscription. The browser uses it to open checkout.</dd>
+
+        <dt>Checkout</dt>
+        <dd>The gateway's payment page where the customer actually pays or approves.</dd>
+
+        <dt>Return URL</dt>
+        <dd>Where the gateway sends the customer's browser after checkout.</dd>
+
+        <dt>Webhook</dt>
+        <dd>A message the gateway's server sends to your server when something happens (payment success, failure, cancellation…).</dd>
+
+        <dt>Idempotency</dt>
+        <dd>Doing the same request twice has the same effect as doing it once.</dd>
+
+        <dt>Settlement</dt>
+        <dd>The gateway paying out collected money to your bank account, usually a day or two later.</dd>
+
+        <dt>MDR</dt>
+        <dd>Merchant Discount Rate: the fee taken from each payment.</dd>
+
+        <dt>Chargeback</dt>
+        <dd>The customer disputes a payment with their bank, and the money is pulled back from you.</dd>
+
+        <dt>Reconciliation</dt>
+        <dd>Matching your records against the gateway's and the bank's to make sure they agree.</dd>
+
+        <dt>Sandbox</dt>
+        <dd>The gateway's test environment. No real money moves.</dd>
+
+        <dt>PCI DSS</dt>
+        <dd>The security standard for anyone who handles card data.</dd>
+
+        <dt>HMAC signature</dt>
+        <dd>A fingerprint made from a message plus a shared secret. Lets you prove a webhook really came from the gateway and wasn't altered.</dd>
+
+        <dt>Replay attack</dt>
+        <dd>Re-sending a real, correctly signed message later to trigger the same effect again. Blocked by checking the timestamp.</dd>
+
+        <dt>Inbox table</dt>
+        <dd>Where you store every incoming webhook before processing it, so nothing is lost and duplicates are easy to spot.</dd>
+
+        <dt>Paid-until</dt>
+        <dd>The date up to which a customer has paid. Access is simply "today is before paid-until".</dd>
+
+        <dt>Renewal</dt>
+        <dd>A scheduled recurring charge (CHARGE) that extends paid-until by one period.</dd>
+
+        <dt>Dunning</dt>
+        <dd>Chasing failed recurring payments: notifying the customer and retrying.</dd>
+
+        <dt>Grace period</dt>
+        <dd>Extra days of access after paid-until while failed charges are retried.</dd>
+
+        <dt>Fulfilment</dt>
+        <dd>Delivering what was paid for: unlocking a feature, issuing a coupon, extending access.</dd>
+
+        <dt>Payment attempt</dt>
+        <dd>One try at paying an order. An order can have several; it's paid when one succeeds.</dd>
+      </dl>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a class="next" href="01-what-is-a-payment-gateway.html"><small>Start</small><span>What is a payment gateway? →</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

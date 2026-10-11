@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Renewals and Cancellations</title>
+  <meta name="description" content="Lesson 9: life after the first payment: monthly renewals, failed charges, cancellations and turning access off.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html" aria-current="page">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 9</p>
+      <h1>Renewals, failures and cancellations</h1>
+      <p class="lead">
+        The first payment is the start of a relationship. After that, money moves every month
+        without the customer present, charges sometimes fail, people cancel from their UPI app,
+        and someone has to switch access off at the right moment.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#timeline">A subscription's life, month by month</a></li>
+          <li><a href="#paid-until">The one number that matters: paid-until</a></li>
+          <li><a href="#renewal">Renewals: one payment, one period</a></li>
+          <li><a href="#failed">Failed charges and ON_HOLD</a></li>
+          <li><a href="#cancel">Cancellations: two doors</a></li>
+          <li><a href="#pause">Pauses and expired cards</a></li>
+          <li><a href="#expiry">Turning access off</a></li>
+          <li><a href="#sources">When access comes from more than one place</a></li>
+          <li><a href="#trial">Free trials</a></li>
+          <li><a href="#plan-change">Changing plans</a></li>
+          <li><a href="#edge-cases">Edge case index</a></li>
+        </ol>
+      </div>
+
+      <h2 id="timeline">A subscription's life, month by month</h2>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 240" role="img" aria-label="Timeline of a subscription with renewal, failed charge, retry, cancellation and expiry">
+            <line x1="30" y1="110" x2="740" y2="110" class="d-line"/>
+
+            <text x="60" y="132" text-anchor="middle" class="d-muted">1 Jan</text>
+            <text x="230" y="132" text-anchor="middle" class="d-muted">1 Feb</text>
+            <text x="400" y="132" text-anchor="middle" class="d-muted">1 Mar</text>
+            <text x="600" y="132" text-anchor="middle" class="d-muted">1 Apr</text>
+
+            <line x1="60" y1="84" x2="60" y2="104" class="d-life"/>
+            <circle cx="60" cy="110" r="7" class="d-box ok"/>
+            <text x="60" y="60" text-anchor="middle" class="d-small">Approved + paid</text>
+            <text x="60" y="76" text-anchor="middle" class="d-muted">paid-until 1 Feb</text>
+
+            <line x1="230" y1="116" x2="230" y2="148" class="d-life"/>
+            <circle cx="230" cy="110" r="7" class="d-box ok"/>
+            <text x="230" y="162" text-anchor="middle" class="d-small">Charge OK</text>
+            <text x="230" y="178" text-anchor="middle" class="d-muted">paid-until 1 Mar</text>
+
+            <line x1="400" y1="84" x2="400" y2="104" class="d-life"/>
+            <circle cx="400" cy="110" r="7" class="d-box bad"/>
+            <text x="400" y="60" text-anchor="middle" class="d-small d-label-bad">Charge fails</text>
+            <text x="400" y="76" text-anchor="middle" class="d-muted">ON_HOLD, gateway retries</text>
+
+            <line x1="450" y1="116" x2="450" y2="148" class="d-life"/>
+            <circle cx="450" cy="110" r="7" class="d-box ok"/>
+            <text x="450" y="162" text-anchor="middle" class="d-small">Retry OK (3 Mar)</text>
+            <text x="450" y="178" text-anchor="middle" class="d-muted">paid-until 1 Apr, not 3 Apr</text>
+
+            <line x1="530" y1="84" x2="530" y2="104" class="d-life"/>
+            <circle cx="530" cy="110" r="7" class="d-box warn"/>
+            <text x="530" y="44" text-anchor="middle" class="d-small">Cancelled in UPI app</text>
+            <text x="530" y="60" text-anchor="middle" class="d-muted">webhook: no more charges</text>
+
+            <line x1="600" y1="116" x2="600" y2="148" class="d-life"/>
+            <circle cx="600" cy="110" r="7" class="d-box"/>
+            <text x="600" y="162" text-anchor="middle" class="d-small">Paid period ends</text>
+            <text x="600" y="178" text-anchor="middle" class="d-muted">access off</text>
+
+            <rect x="60" y="200" width="540" height="18" rx="5" class="d-box ok"/>
+            <text x="330" y="213" text-anchor="middle" class="d-small">customer has access (until paid-until)</text>
+            <rect x="600" y="200" width="140" height="18" rx="5" class="d-box"/>
+            <text x="670" y="213" text-anchor="middle" class="d-muted">free tier</text>
+          </svg>
+        </div>
+        <figcaption>Cancelling stops future charges, not access already paid for. Access ends on the paid-until date.</figcaption>
+      </figure>
+
+      <h2 id="paid-until">The one number that matters: paid-until</h2>
+      <p>
+        Lots of things happen to a subscription: approvals, charges, failures, retries, pauses,
+        cancellations. You can get lost tracking all of them. Instead, keep one simple fact per
+        subscription:
+      </p>
+      <p class="keyidea">"This customer has paid for tier X until date Y."</p>
+      <ul>
+        <li><strong>Every successful payment</strong> moves paid-until forward by exactly one period.</li>
+        <li><strong>Nothing else</strong> moves it. Not a status change, not a failed charge, not a cancellation.</li>
+        <li><strong>Access</strong> is simply: "today is before paid-until".</li>
+      </ul>
+      <p>The gateway's status (ACTIVE, ON_HOLD, CANCELLED…) tells you about <em>future</em> charges. Paid-until tells you about <em>access</em>. Keep them separate.</p>
+
+      <h2 id="renewal">Renewals: one payment, one period</h2>
+      <p>For periodic plans the gateway charges automatically each cycle and sends a webhook (<code>SUBSCRIPTION_PAYMENT_SUCCESS</code> with type <code>CHARGE</code>). Handling it:</p>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Check the signature, store the event</span>
+          <span class="step-body">As in <a href="08-webhooks.html">Lesson 8</a>.</span>
+        </li>
+        <li>
+          <span class="step-title">Insert the payment into the ledger by its payment ID (UNIQUE)</span>
+          <span class="step-body">If the insert is a duplicate, this payment was already counted: stop here.</span>
+        </li>
+        <li>
+          <span class="step-title">Only for a new payment: extend paid-until by one period</span>
+          <span class="step-body">Ideally in the same database transaction as the insert, so you never get "recorded but not extended".</span>
+        </li>
+        <li>
+          <span class="step-title">Optionally confirm with the gateway</span>
+          <span class="step-body">Fetch the payment or subscription to double-check the amount and status.</span>
+        </li>
+      </ol>
+
+      <h3>Extend from the period end, not from "now"</h3>
+      <div class="split">
+        <div>
+          <h4>❌ paid-until = now + 1 month</h4>
+          <p>The charge runs on 3 Mar because of a retry. Access now runs to 3 Apr, and the next one to 3 May… The customer slowly gets extra days, and your dates drift away from the gateway's billing dates. If a charge comes in <em>early</em>, they lose days.</p>
+        </div>
+        <div>
+          <h4>✅ paid-until = old paid-until + 1 month</h4>
+          <p>1 Mar + 1 month = 1 Apr, no matter when the charge actually landed. Your dates stay in step with billing. (If paid-until is long in the past, e.g. after a long gap, restart from the payment date instead.)</p>
+        </div>
+      </div>
+
+      <div class="callout edge">
+        <span class="callout-title">Edge case: AUTH is not a renewal</span>
+        <p>
+          The approval-time payment (<code>AUTH</code>) also arrives as "payment success". It's the
+          <em>first</em> grant, not a renewal, and the first grant usually already happened in verify.
+          Treat AUTH as "grant if not yet granted" and only CHARGE as "extend one period".
+        </p>
+      </div>
+
+      <h2 id="failed">Failed charges and ON_HOLD</h2>
+      <p>Monthly charges fail for ordinary reasons: low balance, bank downtime, an expired card, a revoked UPI mandate.</p>
+      <ul>
+        <li><strong>The gateway usually retries</strong> on its own for a few days. Meanwhile the subscription may show <code>ON_HOLD</code>.</li>
+        <li><strong>Record each failed attempt</strong> in the ledger (with the failure reason). Useful for support and for messages to the customer.</li>
+        <li><strong>Don't cut access immediately.</strong> Paid-until hasn't passed yet, so the customer still has what they paid for.</li>
+        <li><strong>Tell the customer.</strong> "Your payment for March didn't go through. Please check your bank or UPI app." Chasing failed payments is called <strong>dunning</strong>.</li>
+        <li><strong>Decide a grace period</strong> (e.g. 3–7 days after paid-until) during which access continues while retries happen. It's a product choice; write it down.</li>
+        <li><strong>If a retry succeeds</strong> → it's a normal renewal (new payment ID → extend from the old paid-until).</li>
+        <li><strong>If retries are exhausted</strong> → the subscription may be cancelled by the gateway; access ends at paid-until (+ grace).</li>
+      </ul>
+
+      <h2 id="cancel">Cancellations: two doors</h2>
+      <p>A subscription can be cancelled from <strong>your app</strong> or from <strong>outside it</strong>. Both must end in the same state.</p>
+      <div class="split">
+        <div>
+          <h4>Door 1: "Cancel" in your app</h4>
+          <ol>
+            <li>Check the subscription belongs to this user and is actually cancellable (not a trial, not already cancelled, not never-started).</li>
+            <li>Call the gateway's cancel API (e.g. Manage Subscription → <code>CANCEL</code>).</li>
+            <li>On success, mark it cancelled and record <code>cancelledAt</code>.</li>
+            <li>Tell the user: "Auto-pay stopped. You keep access until 1 Apr."</li>
+          </ol>
+        </div>
+        <div>
+          <h4>Door 2: outside your app</h4>
+          <p>The customer revokes the mandate in their UPI app or bank, which is their legal right in India. Or the gateway cancels after failed retries.</p>
+          <p>You only find out through a <strong>webhook</strong> (status changed → <code>CUSTOMER_CANCELLED</code> / <code>CANCELLED</code>). Same result: stop expecting charges, keep access until paid-until.</p>
+        </div>
+      </div>
+      <ul>
+        <li><strong>Cancelling twice is harmless:</strong> the second attempt finds it already cancelled, so reply "already cancelled", not an error.</li>
+        <li><strong>Cancel API fails?</strong> Don't mark it cancelled locally, or the customer is still charged while your app says they aren't. Show an error and let them retry.</li>
+        <li><strong>The cancel webhook arrives after your own cancel:</strong> it's a duplicate in effect. No change needed.</li>
+        <li><strong>Cancelling something that never started</strong> (still <code>INITIALIZED</code>): just mark it abandoned; there's no access to keep.</li>
+      </ul>
+      <div class="callout warn">
+        <span class="callout-title">Watch out: cancel ≠ refund</span>
+        <p>Cancelling stops <em>future</em> charges. It doesn't return money already paid. Refunds are a separate, deliberate action with their own API and rules (a later topic).</p>
+      </div>
+
+      <h2 id="pause">Pauses and expired cards</h2>
+      <ul>
+        <li><strong>Customer paused</strong> (<code>CUSTOMER_PAUSED</code>): no charges while paused. Treat like a soft cancel: access until paid-until; resumes on the next successful charge.</li>
+        <li><strong>Card expired</strong> (<code>CARD_EXPIRED</code>): card mandates die with the card. Access until paid-until, then ask the customer to subscribe again with a new card or UPI. A "card expiring soon" reminder event lets you warn them earlier.</li>
+      </ul>
+
+      <h2 id="expiry">Turning access off</h2>
+      <p>When paid-until passes, someone must actually remove access. Two approaches:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Check at access time</th><th>Scheduled job</th></tr></thead>
+          <tbody>
+            <tr><td>How</td><td>Every feature check asks "is today before paid-until?"</td><td>A job runs every hour or night and downgrades users whose paid-until has passed</td></tr>
+            <tr><td>Accuracy</td><td class="yes">Exact to the second</td><td class="maybe">Late by up to one job interval</td></tr>
+            <tr><td>Speed</td><td>Slightly more work per check</td><td>Checks stay simple (just read the tier)</td></tr>
+            <tr><td>Risk</td><td>Must be added to every check</td><td>If the job stops, nobody is ever downgraded</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A common combination: store the tier for fast checks, run a job to downgrade, <strong>and</strong> double-check paid-until in the backend for important features. Also alert if the job hasn't run.</p>
+      <div class="callout tip">
+        <span class="callout-title">Tip: make the expiry job safe to re-run</span>
+        <p>Write it as "set to the correct tier for everyone whose paid-until has passed" rather than "downgrade by one step". Then running it twice, or after a crash, is harmless.</p>
+      </div>
+
+      <h2 id="sources">When access comes from more than one place</h2>
+      <p>Real products give access from several sources: the customer's own subscription, a free trial, a family member's plan, a promo, an older subscription still within its period.</p>
+      <div class="callout edge">
+        <span class="callout-title">Edge case: one source ending must not cancel the others</span>
+        <p>
+          If any event (a failed new attempt, an expiring trial, a cancelled old plan) simply sets the
+          user to "free", it can wipe out access that's still valid from another source. Instead, when
+          anything changes, <strong>recalculate</strong> access as "the best tier from all still-valid
+          sources".
+        </p>
+      </div>
+
+      <h2 id="trial">Free trials</h2>
+      <ul>
+        <li><strong>No payment involved</strong>: a trial is just a local entitlement with an end date. Keep it in the same "source of access" model, with its own paid-until (trial-until).</li>
+        <li><strong>One per person, forever</strong>: record that the trial was used, so cancelling and re-joining doesn't give another.</li>
+        <li><strong>Nothing to cancel at the gateway</strong>: there's no mandate. "Cancel" on a trial is just "end now" or "let it run out".</li>
+        <li><strong>Trial → paid</strong>: decide whether paid time starts now (trial days are lost) or after the trial ends (requires setting the first charge date). Either is fine if it's deliberate and explained.</li>
+      </ul>
+
+      <h2 id="plan-change">Changing plans</h2>
+      <p>Upgrades and downgrades deserve their own flow. The key rules:</p>
+      <ul>
+        <li><strong>Never end up with two live mandates</strong> for the same customer. They'd be billed twice.</li>
+        <li><strong>A typical upgrade:</strong> create the new subscription → once it's active, cancel the old one → access switches to the higher tier.</li>
+        <li><strong>Proration</strong> (credit for unused days on the old plan) is optional and complex. Many products skip it and simply start the new plan's period now, or at the old period's end.</li>
+        <li><strong>A typical downgrade:</strong> takes effect at the end of the current paid period, so the customer gets what they paid for.</li>
+      </ul>
+
+      <h2 id="edge-cases">Edge case index</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Edge case</th><th>Handled by</th></tr></thead>
+          <tbody>
+            <tr><td>Same renewal webhook twice</td><td>Unique payment ID → extend only for new payments</td></tr>
+            <tr><td>Fake renewal webhook</td><td>Signature check (Lesson 8)</td></tr>
+            <tr><td>Charge lands late after retries</td><td>Extend from old paid-until, not now</td></tr>
+            <tr><td>AUTH payment treated as renewal</td><td>AUTH = first grant only</td></tr>
+            <tr><td>Charge fails</td><td>Record, notify, keep access until paid-until (+ grace)</td></tr>
+            <tr><td>Customer cancels in UPI app</td><td>Status webhook → stop charges, keep access to paid-until</td></tr>
+            <tr><td>Cancel API call fails</td><td>Don't mark cancelled locally; show error</td></tr>
+            <tr><td>User cancels twice</td><td>"Already cancelled", no error</td></tr>
+            <tr><td>Expiry job didn't run</td><td>Backend also checks paid-until; alert on job health</td></tr>
+            <tr><td>Trial ends while a family plan is active</td><td>Recalculate from all sources</td></tr>
+            <tr><td>Upgrade creates a second mandate</td><td>Upgrade flow cancels the old one</td></tr>
+            <tr><td>Card expires</td><td>Access to paid-until; prompt to re-subscribe</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="08-webhooks.html"><small>← Previous</small><span>Webhooks</span></a>
+        <a class="next" href="10-one-time-payments.html"><small>Next →</small><span>One-time payments: add-ons and coupons</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

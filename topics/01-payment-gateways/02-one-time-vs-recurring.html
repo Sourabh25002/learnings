@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One-Time vs Recurring</title>
+  <meta name="description" content="Lesson 2: orders vs subscriptions, mandates, plans, the subscription lifecycle and the first-month trap.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html" aria-current="page">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 2</p>
+      <h1>One-time vs recurring payments</h1>
+      <p class="lead">
+        Buying something once and paying every month look similar to the customer,
+        but they're built very differently. Recurring payments need the customer's
+        permission to take money later, when they're not around.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#one-time">One-time payments (orders)</a></li>
+          <li><a href="#recurring">Recurring payments and mandates</a></li>
+          <li><a href="#mandate-types">Types of mandates in India</a></li>
+          <li><a href="#rules">The rules: RBI recurring payment guidelines</a></li>
+          <li><a href="#plans">Plans</a></li>
+          <li><a href="#anatomy">What's inside a subscription</a></li>
+          <li><a href="#first-month">The first-month trap</a></li>
+          <li><a href="#lifecycle">The subscription lifecycle</a></li>
+          <li><a href="#auth-vs-charge">AUTH vs CHARGE payments</a></li>
+        </ol>
+      </div>
+
+      <h2 id="one-time">One-time payments (orders)</h2>
+      <p>
+        The simple case. You create an <strong>order</strong> for a fixed amount, the customer pays
+        once and it's done. Examples: buying an add-on, unlocking one extra report, a one-off fee.
+      </p>
+      <ol>
+        <li>Your backend asks the gateway: "create an order for ₹999 for this customer".</li>
+        <li>The gateway returns a <strong>session ID</strong>.</li>
+        <li>The customer pays on the gateway's checkout.</li>
+        <li>You confirm the order is <code>PAID</code>, then deliver.</li>
+      </ol>
+      <p>Once paid, the gateway has <strong>no permission</strong> to charge this customer again.</p>
+
+      <h2 id="recurring">Recurring payments and mandates</h2>
+      <p>
+        For a monthly subscription, you need to take money every month <em>without</em> the
+        customer opening your site and approving each time. That permission is called a
+        <strong>mandate</strong>.
+      </p>
+      <div class="analogy">
+        <p>
+          A mandate is like the form you sign at a gym: "you may deduct ₹499 from my account every
+          month until I cancel". You sign it once. After that, the gym collects automatically, and
+          you can cancel it any time.
+        </p>
+      </div>
+      <p>
+        With a gateway, the customer "signs" the mandate on the checkout page by approving it with
+        their UPI PIN, card OTP or bank login. After that, the gateway charges on schedule and tells
+        you each time through a webhook.
+      </p>
+
+      <h2 id="mandate-types">Types of mandates in India</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mandate</th><th>Customer approves with</th><th>How fast it's active</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>UPI AutoPay</strong></td>
+              <td>UPI app + UPI PIN</td>
+              <td class="yes">Instant</td>
+              <td>Most popular. Customers can see and cancel it in their UPI app.</td>
+            </tr>
+            <tr>
+              <td><strong>Card mandate</strong></td>
+              <td>Card details + OTP</td>
+              <td class="yes">Instant</td>
+              <td>Tied to the card. Breaks when the card expires or is replaced.</td>
+            </tr>
+            <tr>
+              <td><strong>eNACH</strong></td>
+              <td>Netbanking, debit card or Aadhaar</td>
+              <td class="maybe">Can take time; the bank must confirm</td>
+              <td>Debits the bank account directly. Good for larger amounts. Run by NPCI.</td>
+            </tr>
+            <tr>
+              <td><strong>Physical NACH</strong></td>
+              <td>Signed paper form</td>
+              <td class="no">Days to weeks</td>
+              <td>Rare for online products.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="callout-title">Why eNACH is special</span>
+        <p>
+          With UPI and cards, approval is final the moment the customer finishes checkout. With eNACH,
+          the customer finishes, but the <strong>bank still has to confirm</strong> the mandate. The
+          subscription sits in a "waiting for bank" state, often called
+          <code>BANK_APPROVAL_PENDING</code>. Your app must decide what to do in that gap: give access
+          now, or wait.
+        </p>
+      </div>
+
+      <h2 id="rules">The rules: RBI recurring payment guidelines</h2>
+      <p>In India, the RBI has rules for automatic debits. The gateway handles most of them for you, but you should know them:</p>
+      <ul>
+        <li><strong>Pre-debit notification.</strong> The customer must be told before each automatic debit (at least 24 hours before). The gateway sends this by SMS or email. You just choose the channels.</li>
+        <li><strong>Extra approval above a limit.</strong> Automatic debits up to a set amount (₹15,000 for most categories, higher for some such as mutual funds, insurance premiums and credit card bills) go through without extra approval. Above that, the customer must approve each debit.</li>
+        <li><strong>Easy cancellation.</strong> The customer can cancel a mandate any time, from their UPI app or bank, <em>without asking you</em>. Your system must handle cancellations that come from outside.</li>
+      </ul>
+      <div class="callout warn">
+        <span class="callout-title">Limits change</span>
+        <p>These amounts have been revised several times. Check the current RBI circular and your gateway's docs before relying on a number.</p>
+      </div>
+
+      <h2 id="plans">Plans</h2>
+      <p>
+        A <strong>plan</strong> is the template for a subscription: <em>what</em> to charge and
+        <em>how often</em>. Think of the Netflix plans: Basic, Standard, Premium. Each customer's
+        subscription points to one plan.
+      </p>
+
+      <h3>Two kinds of plan</h3>
+      <div class="split">
+        <div>
+          <h4>Periodic</h4>
+          <p>Fixed amount on a fixed schedule. The gateway charges automatically. "₹499 every month."</p>
+        </div>
+        <div>
+          <h4>On-demand</h4>
+          <p>No schedule. <em>You</em> call the API to charge, any amount up to a maximum. Good for usage-based billing.</p>
+        </div>
+      </div>
+
+      <h3>Plan fields, in plain words</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Meaning</th><th>Monthly ₹499 example</th></tr></thead>
+          <tbody>
+            <tr><td><code>plan_id</code></td><td>Your unique name for the plan</td><td><code>starter_monthly_v1</code></td></tr>
+            <tr><td><code>plan_type</code></td><td>Periodic or on-demand</td><td><code>PERIODIC</code></td></tr>
+            <tr><td><code>recurring amount</code></td><td>What each cycle costs</td><td>499</td></tr>
+            <tr><td><code>max_amount</code></td><td>The most that can ever be taken in one debit. The customer sees this when approving.</td><td>499 (or a bit higher if prices may rise)</td></tr>
+            <tr><td><code>interval_type</code> + <code>intervals</code></td><td>How often: "every <em>N</em> DAY / WEEK / MONTH / YEAR"</td><td>MONTH, 1</td></tr>
+            <tr><td><code>max_cycles</code></td><td>Stop after this many charges (the status becomes <code>COMPLETED</code>)</td><td>Empty or very large, for "until cancelled"</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Where plans come from</h3>
+      <p>You can create plans in two ways, and both give the same result:</p>
+      <ul>
+        <li><strong>Dashboard:</strong> fill a form in the gateway's website.</li>
+        <li><strong>API:</strong> one call (e.g. <code>POST /plans</code>) from a small setup script.</li>
+      </ul>
+      <p>
+        Either way it's a <strong>one-time setup per environment</strong>: once in sandbox and once in
+        production. It isn't something customers trigger, so it doesn't need retry protection. If the
+        call fails, check whether the plan exists and run it again.
+      </p>
+      <p>
+        Some gateways (Cashfree included) also let you skip separate plans and describe the plan
+        <strong>inline</strong> inside each "create subscription" request.
+      </p>
+
+      <div class="callout edge">
+        <span class="callout-title">Edge cases with plans</span>
+        <ul>
+          <li><strong>Plans usually can't be edited.</strong> To change a price, create a <em>new</em> plan (<code>starter_monthly_v2</code>) and point new subscriptions at it. Existing subscribers stay on the old price unless you move them.</li>
+          <li><strong>The price is defined in two places.</strong> If your code says ₹499 but the gateway's plan says ₹599, the customer is charged ₹599 while your database records ₹499. Keep one source of truth: either build plans inline from your config, or check at startup that they match.</li>
+          <li><strong>Max amount is a hard cap.</strong> If you later raise the price above it, existing mandates can't charge the new amount. The customer must approve a new mandate.</li>
+        </ul>
+      </div>
+
+      <h2 id="anatomy">What's inside a subscription</h2>
+      <p>When you ask the gateway to create a subscription, you describe these parts:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Part</th><th>What it is</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Your subscription ID</strong></td><td>Your own unique ID (e.g. <code>sub_42_1717171717_a9f3</code>). The gateway also creates its own ID. Store both.</td></tr>
+            <tr><td><strong>Customer details</strong></td><td>Name, email, phone. Used for checkout and pre-debit notifications. Optionally bank details to pre-fill eNACH.</td></tr>
+            <tr><td><strong>Plan</strong></td><td>A plan ID, or the plan described inline.</td></tr>
+            <tr><td><strong>Authorization details</strong></td><td>Which methods are allowed (UPI, card, eNACH) and how much to charge <em>at approval time</em> (the "auth amount").</td></tr>
+            <tr><td><strong>First charge time</strong></td><td>When the first <em>scheduled</em> charge happens.</td></tr>
+            <tr><td><strong>Return URL</strong></td><td>Where the customer's browser goes after checkout.</td></tr>
+            <tr><td><strong>Session expiry</strong></td><td>How long the checkout link stays usable.</td></tr>
+            <tr><td><strong>Expiry time</strong></td><td>When the whole mandate ends (often far in the future).</td></tr>
+            <tr><td><strong>Notification channels</strong></td><td>SMS and/or email for pre-debit notices.</td></tr>
+            <tr><td><strong>Tags / metadata</strong></td><td>Your own key-value notes (user ID, plan key). They come back in responses and webhooks, which helps with debugging.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The response gives you the gateway's subscription ID, a status (<code>INITIALIZED</code> at
+        first: nothing approved yet) and a <strong>session ID</strong> to open checkout.
+      </p>
+
+      <h2 id="first-month">The first-month trap</h2>
+      <p>
+        Two settings decide when the customer pays for the first month, and they interact badly if
+        you don't think about them together:
+      </p>
+      <ul>
+        <li><strong>Auth amount:</strong> money taken <em>when the customer approves</em> the mandate. It can be a token amount (₹1, often refunded) or a full month's price.</li>
+        <li><strong>First charge time:</strong> when the <em>first scheduled</em> charge runs.</li>
+      </ul>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Setup</th><th>What happens</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Auth = full month, first charge = now</td><td>Customer pays at approval, and again right away</td><td class="no">Double charge</td></tr>
+            <tr><td>Auth = full month, first charge = +1 month</td><td>The approval payment <em>is</em> month 1</td><td class="yes">Correct</td></tr>
+            <tr><td>Auth = token (refunded), first charge = now</td><td>Token taken and returned; month 1 charged immediately</td><td class="yes">Correct</td></tr>
+            <tr><td>Auth = token, first charge = +1 month</td><td>Nobody paid for month 1</td><td class="no">Free month</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout edge">
+        <span class="callout-title">eNACH breaks the pattern</span>
+        <p>
+          eNACH can't take money at approval: the auth amount is effectively ₹0. If your design relies on
+          "auth amount = month 1", eNACH users get month 1 free. Either set the first charge to happen
+          immediately for eNACH, or accept it as a known gap. Test every payment method in sandbox and
+          check exactly when each charge happens.
+        </p>
+      </div>
+
+      <h2 id="lifecycle">The subscription lifecycle</h2>
+      <p>A subscription moves through states. Exact names vary by gateway; these are Cashfree's, and others are similar.</p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 350" role="img" aria-label="Subscription state diagram">
+            <defs>
+              <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <rect x="20" y="150" width="150" height="44" rx="22" class="d-box accent"/>
+            <text x="95" y="176" text-anchor="middle" class="d-text d-mono">INITIALIZED</text>
+
+            <rect x="215" y="40" width="185" height="44" rx="22" class="d-box warn"/>
+            <text x="307" y="66" text-anchor="middle" class="d-text d-mono">BANK_APPROVAL_PENDING</text>
+
+            <rect x="430" y="150" width="130" height="44" rx="22" class="d-box ok"/>
+            <text x="495" y="176" text-anchor="middle" class="d-text d-mono">ACTIVE</text>
+
+            <rect x="610" y="40" width="135" height="44" rx="22" class="d-box warn"/>
+            <text x="677" y="66" text-anchor="middle" class="d-text d-mono">ON_HOLD</text>
+
+            <rect x="610" y="150" width="135" height="44" rx="22" class="d-box"/>
+            <text x="677" y="176" text-anchor="middle" class="d-text d-mono">CUSTOMER_PAUSED</text>
+
+            <rect x="602" y="255" width="152" height="60" rx="22" class="d-box bad"/>
+            <text x="678" y="280" text-anchor="middle" class="d-text d-mono">CANCELLED</text>
+            <text x="678" y="298" text-anchor="middle" class="d-muted d-mono">COMPLETED · EXPIRED</text>
+
+            <rect x="20" y="270" width="150" height="44" rx="22" class="d-box bad"/>
+            <text x="95" y="296" text-anchor="middle" class="d-text d-mono">LINK_EXPIRED</text>
+
+            <line x1="120" y1="150" x2="238" y2="86" class="d-line" marker-end="url(#ah2)"/>
+            <text x="168" y="108" text-anchor="end" class="d-small">eNACH done</text>
+
+            <line x1="380" y1="86" x2="468" y2="148" class="d-line" marker-end="url(#ah2)"/>
+            <text x="420" y="128" text-anchor="end" class="d-small">bank confirms</text>
+
+            <line x1="170" y1="172" x2="428" y2="172" class="d-line" marker-end="url(#ah2)"/>
+            <text x="299" y="164" text-anchor="middle" class="d-small">UPI / card approved</text>
+
+            <line x1="555" y1="150" x2="648" y2="86" class="d-line" marker-end="url(#ah2)"/>
+            <text x="614" y="126" class="d-small">charge fails</text>
+
+            <path d="M610 62 Q500 62 490 148" class="d-line d-dash" marker-end="url(#ah2)"/>
+            <text x="520" y="54" text-anchor="middle" class="d-small">retry succeeds</text>
+
+            <line x1="560" y1="172" x2="608" y2="172" class="d-line" marker-end="url(#ah2)"/>
+
+            <line x1="530" y1="194" x2="622" y2="258" class="d-line" marker-end="url(#ah2)"/>
+            <text x="582" y="246" text-anchor="end" class="d-small">cancel · last cycle · expiry</text>
+
+            <line x1="95" y1="194" x2="95" y2="268" class="d-line" marker-end="url(#ah2)"/>
+            <text x="105" y="236" class="d-small">not finished in time</text>
+
+            <rect x="210" y="330" width="12" height="12" rx="3" class="d-box ok"/>
+            <text x="228" y="340" class="d-muted">customer has access</text>
+            <rect x="360" y="330" width="12" height="12" rx="3" class="d-box warn"/>
+            <text x="378" y="340" class="d-muted">waiting / retrying (your policy)</text>
+            <rect x="560" y="330" width="12" height="12" rx="3" class="d-box bad"/>
+            <text x="578" y="340" class="d-muted">ended</text>
+          </svg>
+        </div>
+        <figcaption>The happy path is INITIALIZED → ACTIVE. Everything else is an edge case you must handle.</figcaption>
+      </figure>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>State</th><th>What it means</th><th>Give access?</th></tr></thead>
+          <tbody>
+            <tr><td><code>INITIALIZED</code></td><td>Created, but the customer hasn't approved yet (or is still doing it)</td><td class="no">No</td></tr>
+            <tr><td><code>BANK_APPROVAL_PENDING</code></td><td>Customer finished eNACH; waiting for the bank</td><td class="maybe">Your choice. Many products give access now to avoid a bad first experience.</td></tr>
+            <tr><td><code>ACTIVE</code></td><td>Mandate approved; charges will run on schedule</td><td class="yes">Yes</td></tr>
+            <tr><td><code>ON_HOLD</code></td><td>A charge failed; the gateway may retry</td><td class="maybe">Usually keep access until the paid period ends</td></tr>
+            <tr><td><code>CUSTOMER_PAUSED</code></td><td>Customer paused it from their app</td><td class="maybe">Access until the paid period ends</td></tr>
+            <tr><td><code>CANCELLED</code> / <code>CUSTOMER_CANCELLED</code></td><td>Stopped by you or by the customer</td><td class="maybe">Until the paid period ends; no more charges</td></tr>
+            <tr><td><code>COMPLETED</code></td><td>Reached max cycles</td><td class="maybe">Until the paid period ends</td></tr>
+            <tr><td><code>LINK_EXPIRED</code></td><td>Checkout never finished in time</td><td class="no">No; it never started</td></tr>
+            <tr><td><code>CARD_EXPIRED</code></td><td>Card mandate can't charge anymore</td><td class="maybe">Until the paid period ends; ask the customer to re-subscribe</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout edge">
+        <span class="callout-title">Edge case: a failed new attempt must not remove old access</span>
+        <p>
+          A customer with active access starts checkout for a different plan, then abandons it. That
+          new subscription becomes <code>LINK_EXPIRED</code>. If your code reacts by setting the user to
+          "no access", you've just taken away something they paid for. Only change a user's access
+          based on the subscription that actually <em>granted</em> it.
+        </p>
+      </div>
+
+      <div class="callout tip">
+        <span class="callout-title">Tip: separate "payment state" from "access"</span>
+        <p>
+          The subscription status says what the <em>mandate</em> is doing. Access should come from
+          what was <em>paid for</em>: usually "paid until <code>expiryDate</code>". A cancelled
+          subscription can still give access until its paid period ends.
+        </p>
+      </div>
+
+      <h2 id="auth-vs-charge">AUTH vs CHARGE payments</h2>
+      <p>One subscription produces many individual <strong>payments</strong> over its life:</p>
+      <div class="split">
+        <div>
+          <h4>AUTH payment</h4>
+          <p>Happens once, when the customer approves the mandate. It may be ₹0 (eNACH), a token amount, or a full month.</p>
+        </div>
+        <div>
+          <h4>CHARGE payment</h4>
+          <p>Every scheduled debit after that: month 2, month 3… Each one can succeed or fail on its own.</p>
+        </div>
+      </div>
+      <p>
+        Keep a <strong>payments ledger</strong>: one row per actual payment, keyed by the gateway's
+        payment ID, separate from the subscription row. That gives you receipts, a history, and
+        protection against counting the same payment twice.
+      </p>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="01-what-is-a-payment-gateway.html"><small>← Previous</small><span>What is a payment gateway?</span></a>
+        <a class="next" href="03-the-big-picture.html"><small>Next →</small><span>The end-to-end flow</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

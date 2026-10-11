@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The End-to-End Flow</title>
+  <meta name="description" content="Lesson 3: from the Subscribe click to access granted: create, checkout, return URL, verify and webhooks.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html" aria-current="page">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 3</p>
+      <h1>The end-to-end flow</h1>
+      <p class="lead">
+        This is the map for the rest of the chapter: every step from the customer clicking
+        "Subscribe" to them getting access, and every month after that.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#golden-rule">The golden rule</a></li>
+          <li><a href="#flow">The full flow, step by step</a></li>
+          <li><a href="#two-paths">Why there are two ways back</a></li>
+          <li><a href="#return-url">The return URL, properly</a></li>
+          <li><a href="#mobile">Mobile apps and webviews</a></li>
+          <li><a href="#records">What you store</a></li>
+          <li><a href="#access">Payment status vs access</a></li>
+        </ol>
+      </div>
+
+      <h2 id="golden-rule">The golden rule</h2>
+      <p class="keyidea">
+        Never believe the browser about money. Only believe what the gateway tells your
+        server directly.
+      </p>
+      <p>Everything that happens in the customer's browser can be faked or can simply fail:</p>
+      <ul>
+        <li>Anyone can type <code>?payment=success</code> into a URL.</li>
+        <li>Your frontend code can be edited in dev tools to "send" any amount or plan.</li>
+        <li>The customer can close the tab one second after paying.</li>
+      </ul>
+      <p>
+        So the browser's job is only to <strong>start things and show results</strong>. Every
+        decision about money or access is made on your server, using information it gets
+        <strong>from the gateway directly</strong> (server-to-server).
+      </p>
+
+      <h2 id="flow">The full flow, step by step</h2>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 650" role="img" aria-label="Sequence diagram of the payment flow between browser, backend and gateway">
+            <defs>
+              <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+              <marker id="ah3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head accent"/>
+              </marker>
+            </defs>
+
+            <rect x="0" y="352" width="760" height="196" class="d-band"/>
+            <rect x="0" y="552" width="760" height="98" class="d-band"/>
+            <text x="10" y="372" class="d-text d-label-accent">Path A: the browser comes back</text>
+            <text x="10" y="572" class="d-text d-label-accent">Path B: the gateway calls you</text>
+
+            <rect x="25" y="10" width="170" height="40" rx="8" class="d-box"/>
+            <text x="110" y="35" text-anchor="middle" class="d-text">Browser</text>
+            <rect x="295" y="10" width="170" height="40" rx="8" class="d-box accent"/>
+            <text x="380" y="35" text-anchor="middle" class="d-text">Your backend</text>
+            <rect x="565" y="10" width="170" height="40" rx="8" class="d-box"/>
+            <text x="650" y="35" text-anchor="middle" class="d-text">Gateway</text>
+
+            <line x1="110" y1="50" x2="110" y2="645" class="d-life"/>
+            <line x1="380" y1="50" x2="380" y2="645" class="d-life"/>
+            <line x1="650" y1="50" x2="650" y2="645" class="d-life"/>
+
+            <line x1="110" y1="85" x2="377" y2="85" class="d-line" marker-end="url(#ah3)"/>
+            <text x="245" y="77" text-anchor="middle" class="d-small">① Subscribe (sends only a plan key)</text>
+
+            <line x1="380" y1="125" x2="647" y2="125" class="d-line" marker-end="url(#ah3)"/>
+            <text x="515" y="117" text-anchor="middle" class="d-small">② Create subscription</text>
+
+            <line x1="650" y1="165" x2="383" y2="165" class="d-line d-dash" marker-end="url(#ah3)"/>
+            <text x="515" y="157" text-anchor="middle" class="d-small">③ session ID + gateway's ID</text>
+
+            <rect x="305" y="180" width="150" height="30" rx="6" class="d-box accent"/>
+            <text x="380" y="200" text-anchor="middle" class="d-small">④ save PENDING row</text>
+
+            <line x1="380" y1="240" x2="113" y2="240" class="d-line d-dash" marker-end="url(#ah3)"/>
+            <text x="245" y="232" text-anchor="middle" class="d-small">⑤ session ID</text>
+
+            <line x1="110" y1="280" x2="647" y2="280" class="d-line" marker-end="url(#ah3)"/>
+            <text x="245" y="272" text-anchor="middle" class="d-small">⑥ open checkout (SDK)</text>
+
+            <rect x="570" y="296" width="160" height="44" rx="6" class="d-box accent"/>
+            <text x="650" y="315" text-anchor="middle" class="d-small">⑦ customer approves</text>
+            <text x="650" y="331" text-anchor="middle" class="d-muted">UPI · card · eNACH</text>
+
+            <line x1="650" y1="392" x2="113" y2="392" class="d-line d-dash" marker-end="url(#ah3)"/>
+            <text x="515" y="384" text-anchor="middle" class="d-small">⑧ redirect to return URL</text>
+
+            <line x1="110" y1="430" x2="377" y2="430" class="d-line" marker-end="url(#ah3)"/>
+            <text x="245" y="422" text-anchor="middle" class="d-small">⑨ "please verify order X"</text>
+
+            <line x1="380" y1="466" x2="647" y2="466" class="d-line" marker-end="url(#ah3)"/>
+            <text x="515" y="458" text-anchor="middle" class="d-small">⑩ fetch real status</text>
+
+            <line x1="650" y1="498" x2="383" y2="498" class="d-line d-dash" marker-end="url(#ah3)"/>
+            <text x="515" y="490" text-anchor="middle" class="d-small">ACTIVE</text>
+
+            <rect x="300" y="510" width="160" height="28" rx="6" class="d-box ok"/>
+            <text x="380" y="529" text-anchor="middle" class="d-small">grant access (once)</text>
+
+            <line x1="650" y1="592" x2="383" y2="592" class="d-line accent" marker-end="url(#ah3a)"/>
+            <text x="515" y="584" text-anchor="middle" class="d-small d-label-accent">webhook (signed): now, later, every month</text>
+
+            <rect x="285" y="604" width="190" height="28" rx="6" class="d-box ok"/>
+            <text x="380" y="623" text-anchor="middle" class="d-small">check signature → grant (once)</text>
+          </svg>
+        </div>
+        <figcaption>Steps 1–7 start the payment. Paths A and B both bring the result back. Both must be safe to run, and safe to run together.</figcaption>
+      </figure>
+
+      <h3>Starting the payment (steps 1–7)</h3>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Customer clicks "Subscribe"</span>
+          <span class="step-body">The browser sends only <em>which plan</em> (e.g. <code>STARTER_MONTHLY</code>). Never a price. The server knows who the user is from their login token.</span>
+        </li>
+        <li>
+          <span class="step-title">Your backend asks the gateway to create the subscription</span>
+          <span class="step-body">With your secret keys, from your server. Lesson 6 covers everything that must happen before this call.</span>
+        </li>
+        <li>
+          <span class="step-title">The gateway returns a session ID</span>
+          <span class="step-body">A short-lived token that lets one browser open checkout for this one subscription. It isn't a secret key, so it's safe to send to the browser.</span>
+        </li>
+        <li>
+          <span class="step-title">Your backend saves a PENDING record</span>
+          <span class="step-body">Before replying to the browser. This guarantees you never have a payment you don't know about.</span>
+        </li>
+        <li>
+          <span class="step-title">The browser receives the session ID</span>
+          <span class="step-body">Plus whether it's sandbox or production, so the SDK opens the right checkout.</span>
+        </li>
+        <li>
+          <span class="step-title">The browser opens the gateway's checkout</span>
+          <span class="step-body">Using the gateway's JavaScript SDK, e.g. <code>subscriptionsCheckout({ subsSessionId })</code>. The customer is now on the gateway's page, not yours.</span>
+        </li>
+        <li>
+          <span class="step-title">The customer approves</span>
+          <span class="step-body">UPI PIN, card OTP or bank login. Your app sees none of this.</span>
+        </li>
+      </ol>
+
+      <h3>Getting the result back (paths A and B)</h3>
+      <p>
+        <strong>Path A, return + verify:</strong> the gateway sends the browser to your return URL.
+        Your app then asks your backend "please verify order X", and your backend
+        <strong>fetches the real status from the gateway</strong>. It never trusts the redirect itself.
+      </p>
+      <p>
+        <strong>Path B, webhook:</strong> the gateway's server calls your server directly with a
+        signed message. You check the signature (proof it really came from the gateway), then act.
+        Webhooks also deliver everything that happens <em>later</em>: monthly charges, failures,
+        cancellations.
+      </p>
+
+      <h2 id="two-paths">Why there are two ways back</h2>
+      <p>Each path fails in situations where the other one still works:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Situation</th><th>Path A (return)</th><th>Path B (webhook)</th></tr></thead>
+          <tbody>
+            <tr><td>Customer closes the tab right after paying</td><td class="no">Never happens</td><td class="yes">Still arrives</td></tr>
+            <tr><td>Phone switches to the UPI app and never comes back</td><td class="no">Never happens</td><td class="yes">Still arrives</td></tr>
+            <tr><td>Webhook is delayed for minutes</td><td class="yes">Customer sees the result immediately</td><td class="maybe">Late</td></tr>
+            <tr><td>Your webhook endpoint was down</td><td class="yes">Still works</td><td class="maybe">Gateway retries later</td></tr>
+            <tr><td>Monthly renewal, cancellation from a UPI app</td><td class="no">Customer isn't involved</td><td class="yes">Only way to know</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout edge">
+        <span class="callout-title">Edge case: both paths arrive at the same moment</span>
+        <p>
+          This is common: the customer returns and the webhook lands within the same second. If both
+          check "has access been granted?", both see "no" and both grant it, you can end up extending
+          access twice or writing duplicate records. Granting must happen <strong>exactly once</strong>:
+          use a database lock or an atomic update such as "set to ACTIVE only if not already ACTIVE".
+        </p>
+      </div>
+
+      <h2 id="return-url">The return URL, properly</h2>
+      <p>The return URL is where the gateway sends the browser after checkout. Things to know:</p>
+      <ul>
+        <li><strong>It carries no login.</strong> The request comes from a redirect, often without your auth token. So put <em>your order ID</em> in the URL to know which payment it's about. Never put anything secret there.</li>
+        <li><strong>It isn't proof of payment.</strong> Anyone can open that URL. It only means "go and check"; your server then fetches the real status.</li>
+        <li><strong>Build it from config, not from the incoming request.</strong> Behind a load balancer, your server may think it's on <code>http://</code> or an internal hostname. Use a fixed setting like <code>API_BASE_URL=https://api.yourapp.com</code>.</li>
+        <li><strong>It can arrive as GET or POST.</strong> Some gateways post form data to it. Accept both.</li>
+        <li><strong>Always redirect somewhere real.</strong> Every branch, including "order ID missing", must land on a page that exists, never a 404.</li>
+        <li><strong>Clean up afterwards.</strong> Once the frontend has read <code>order_id</code> from the URL, remove it (through your router, not around it). Otherwise a refresh or navigation verifies again.</li>
+      </ul>
+
+      <h2 id="mobile">Mobile apps and webviews</h2>
+      <p>
+        If your app runs inside a webview (Capacitor, Cordova, React Native WebView), the checkout and
+        the return need extra care:
+      </p>
+      <ul>
+        <li>The webview may open the gateway's page in the <strong>system browser</strong>. The return URL then lands in the browser, not your app, where the user isn't logged in.</li>
+        <li>Fixes: use the gateway's <strong>native SDK</strong> for Android/iOS, or an in-app browser plus a <strong>deep link</strong> that brings the user back into the app.</li>
+        <li>Either way, the webhook still grants access. So the user has paid; they just see a confusing screen. Test this flow on a real device.</li>
+      </ul>
+
+      <h2 id="records">What you store</h2>
+      <p>Two tables cover most needs:</p>
+      <div class="split">
+        <div>
+          <h4>Subscriptions (one row per subscription)</h4>
+          <ul>
+            <li>your subscription ID (unique)</li>
+            <li>the gateway's subscription ID</li>
+            <li>user, plan, amount, currency</li>
+            <li>gateway status (raw string) + your own status</li>
+            <li>paid-until / expiry date</li>
+            <li>created, updated, cancelled timestamps</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Payments ledger (one row per payment)</h4>
+          <ul>
+            <li>the gateway's payment ID (unique)</li>
+            <li>which subscription it belongs to</li>
+            <li>AUTH or CHARGE, amount, status</li>
+            <li>payment method (UPI, card, eNACH)</li>
+            <li>failure reason, if any</li>
+            <li>billing period it covers</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout tip">
+        <span class="callout-title">Tip: keep the raw status</span>
+        <p>
+          Store the gateway's exact status string (<code>ACTIVE</code>, <code>ON_HOLD</code>…) as well
+          as your own simplified status. When something looks wrong months later, the raw value tells
+          you exactly what the gateway said.
+        </p>
+      </div>
+
+      <h2 id="access">Payment status vs access</h2>
+      <p>
+        "Is the subscription active?" and "should this user see Pro features?" are
+        <strong>different questions</strong>:
+      </p>
+      <ul>
+        <li>A <strong>cancelled</strong> subscription can still give access until the end of the period the customer paid for.</li>
+        <li>An <strong>active</strong> subscription might belong to an old plan, not the one giving current access.</li>
+        <li>Access may also come from somewhere else: a free trial, or a family member's plan.</li>
+      </ul>
+      <p>
+        A clean design keeps payment records as the <em>history</em> and derives access from them
+        ("paid until date X for tier Y"). Then access checks can be simple and fast.
+      </p>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="02-one-time-vs-recurring.html"><small>← Previous</small><span>One-time vs recurring payments</span></a>
+        <a class="next" href="04-talking-to-the-gateway-api.html"><small>Next →</small><span>Talking to the gateway API</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

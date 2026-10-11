@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payments Interview Q&amp;A</title>
+  <meta name="description" content="Lesson 11: interview questions on payment gateway integration, from basics to deep design, scenarios and my own project, with answers to give.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html" aria-current="page">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 11</p>
+      <h1>Interview questions &amp; answers</h1>
+      <p class="lead">
+        Everything from this chapter, turned into the questions people actually ask, from
+        "what is a payment gateway?" to "how do you guarantee a webhook never grants access twice?",
+        plus questions about the system I built. Each answer is written the way I'd say it out loud.
+      </p>
+
+      <div class="toc">
+        <strong>Sections</strong>
+        <ol>
+          <li><a href="#how-to-answer">How to answer well</a></li>
+          <li><a href="#basics">Basics</a> <span class="badge basic">surface</span></li>
+          <li><a href="#how-it-works">How it works</a> <span class="badge mid">intermediate</span></li>
+          <li><a href="#deep">Design and edge cases</a> <span class="badge deep">deep</span></li>
+          <li><a href="#scenarios">"What would you do if…" scenarios</a></li>
+          <li><a href="#my-project">About my project</a></li>
+          <li><a href="#quickfire">Quick-fire revision</a></li>
+        </ol>
+      </div>
+
+      <div class="qa-toolbar">
+        <button class="btn" type="button" data-qa="open">Show all answers</button>
+        <button class="btn" type="button" data-qa="close">Hide all answers</button>
+      </div>
+      <p class="meta">Tip: keep answers hidden, say your answer out loud, then open it to compare.</p>
+
+      <!-- ================================================================== -->
+      <h2 id="how-to-answer">How to answer well</h2>
+      <p>A simple shape that works for almost every technical question:</p>
+      <ol>
+        <li><strong>One-line answer first.</strong> "A webhook is the gateway calling my server when something happens."</li>
+        <li><strong>Why it exists.</strong> "Because many events happen when the user isn't on my site."</li>
+        <li><strong>A concrete example.</strong> "Like a monthly UPI AutoPay charge."</li>
+        <li><strong>One edge case.</strong> "They can arrive twice, so my handler is idempotent." This is what separates a good answer from a textbook one.</li>
+      </ol>
+      <p>For "tell me about your project" questions: the <strong>problem</strong>, what <strong>you</strong> built, one <strong>hard part</strong> and how you solved it, and what you'd <strong>improve</strong>.</p>
+      <div class="callout tip">
+        <span class="callout-title">Tip: say "it depends" with a reason</span>
+        <p>For design questions, naming the trade-off ("a cron job is simpler, but access can stay on until it runs") sounds more senior than one confident answer.</p>
+      </div>
+
+      <!-- ================================================================== -->
+      <h2 id="basics">Basics</h2>
+
+      <details class="qa">
+        <summary><span class="q">What is a payment gateway?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>It's the service that lets my app accept money online without me handling card or bank details. My server tells it "charge this customer this amount", the customer pays on the gateway's secure page, and the gateway tells my server whether it worked. Examples are Cashfree, Razorpay and Stripe.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the difference between a payment gateway and a payment aggregator?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>A gateway is only the technology pipe; money goes to a merchant account I hold with a bank. An aggregator is the pipe <em>plus</em> the money handling: it collects funds on my behalf and settles them to my bank account. That's why onboarding with Cashfree or Razorpay is quick. In India, aggregators are licensed by the RBI.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Who's involved when someone pays by card?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>The customer; me, the merchant; the gateway; the card network like Visa, Mastercard or RuPay; the customer's bank, called the issuer, which approves or declines; and the acquiring bank on the merchant side. For UPI, NPCI plays the network's role.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the difference between authorization and settlement?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>Authorization is the real-time "yes, this customer can pay": it happens in seconds and it's what I use to grant access. Settlement is the money actually arriving in my bank account, usually a day or two later and minus fees. So "payment successful" doesn't mean the money is in my account yet.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is MDR?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>Merchant Discount Rate: the fee the gateway takes from each payment, usually a percentage. It varies by method; UPI is typically cheapest and credit cards most expensive.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is PCI DSS, and why do we use hosted checkout?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>PCI DSS is the security standard for anyone who stores, processes or even sees card numbers, and complying with it is expensive. With hosted checkout, card details go straight to the gateway's page, so my servers never see them and most of that burden disappears. The gateway also handles OTP, UPI app switching and bank-specific flows.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the difference between sandbox and production?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>Sandbox is a full test environment with fake money; production is real. They have different API keys, different base URLs and separate data, so plans and webhook URLs created in sandbox must be created again in production. Using sandbox keys against the production URL gives a 401.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the difference between a one-time payment and a subscription?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>A one-time payment is an order for a fixed amount: pay once, done. A subscription needs permission to charge again later without the customer present. That permission is a <strong>mandate</strong>, which the customer approves once, and then the gateway charges on schedule.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What types of mandates exist in India?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p><strong>UPI AutoPay</strong>, approved with the UPI PIN, instant. <strong>Card mandates</strong>, approved with an OTP, which break when the card expires. <strong>eNACH</strong>, a bank-account mandate approved by netbanking, debit card or Aadhaar, where the bank still has to confirm, so it can take time. And <strong>physical NACH</strong>, a paper form, which is slow.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What RBI rules apply to recurring payments?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>The customer must get a pre-debit notification before each automatic debit, at least 24 hours before. Debits above a limit need extra approval from the customer; that limit is ₹15,000 for most categories and higher for some, like mutual funds and insurance. And customers can cancel a mandate any time from their UPI app or bank. The gateway handles notifications, but my system must handle cancellations that come from outside.</p>
+          <p class="followup">Mention that the limits are revised from time to time and you'd check the current circular.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is a webhook?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>It's the gateway calling my server, an HTTP POST, when something happens: a payment succeeded, a monthly charge failed, the customer cancelled. It's the only way to learn about events when the customer isn't on my site.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is a return URL?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>Where the gateway sends the customer's browser after checkout. It's only for user experience: it tells my app "go and check". It isn't proof of payment, because anyone can open that URL.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's a session ID, and why don't you send the amount from the frontend?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>When my backend creates an order, the gateway returns a short-lived session ID; the browser uses it to open checkout for that specific order. The amount is fixed on the server when creating the order. If the frontend sent the amount, anyone could edit it to ₹1. The frontend only sends <em>which plan</em>.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the difference between a refund and a chargeback?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>A refund is me returning money voluntarily. A chargeback is the customer disputing the payment with <em>their bank</em>, and the bank pulling the money back from me. I can contest a chargeback with evidence, and too many of them can hurt the merchant account.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is reconciliation?</span><span class="badge basic">surface</span></summary>
+        <div class="answer">
+          <p>Regularly checking that my database, the gateway's records and my bank statements all agree: every successful payment granted access, every grant had a payment, and settlements match. It catches missed webhooks and bugs.</p>
+        </div>
+      </details>
+
+      <!-- ================================================================== -->
+      <h2 id="how-it-works">How it works</h2>
+
+      <details class="qa">
+        <summary><span class="q">Walk me through a subscription payment end to end.</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <ol>
+            <li>The user clicks Subscribe; the frontend sends only the plan key.</li>
+            <li>My backend checks the user and plan, then calls the gateway's Create Subscription API with the price from server config, and gets a session ID.</li>
+            <li>I save a pending record <em>before</em> replying, then send the session ID to the browser.</li>
+            <li>The browser opens the gateway's checkout; the customer approves with UPI, a card or eNACH.</li>
+            <li>Two ways back: the browser returns to my return URL and my app calls verify, which fetches the real status from the gateway; and the gateway sends a signed webhook. Both grant access exactly once.</li>
+            <li>After that, monthly charges arrive as webhooks and extend access.</li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Why do you need both verify and webhooks? Isn't one enough?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Each covers the other's gaps. If the user closes the tab or their phone stays in the UPI app, verify never happens, but the webhook still arrives. If the webhook is delayed, verify lets the user see success immediately. And renewals and cancellations from a UPI app only come as webhooks. The catch is that both can arrive together, so granting has to be idempotent.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Why can't you trust the frontend about payment status?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Anything in the browser can be faked: someone can type <code>?payment=success</code> or edit requests in dev tools. So the browser only starts things and shows results. My server decides, based on what it fetches from the gateway directly, server to server.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do you know a webhook really came from the gateway?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>By its signature. The gateway computes an HMAC-SHA256 of the timestamp plus the raw body, using a secret only we share, and sends it in a header. I compute the same thing and compare. If it doesn't match, or the headers are missing, I reject it. I also check the timestamp is recent to block replays, and I compare in constant time.</p>
+          <p class="followup">Likely follow-up: "why the raw body?" (next question).</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Why must signature verification use the raw request body?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>The signature is over the exact bytes the gateway sent. If my framework parses the JSON and I stringify it again, whitespace or key order can change, and the HMAC won't match even for a genuine webhook. So I capture the raw body before parsing.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is idempotency?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Doing the same operation twice has the same effect as doing it once. Reads are naturally idempotent; "create subscription" or "charge ₹499" aren't. In payments it's what makes retries safe: if a request times out I can retry without creating a duplicate or charging twice.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the difference between an idempotency key and a unique order ID?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>The unique ID is a business rule: no two subscriptions with the same ID, so sending it again gives "already exists". The idempotency key is a retry rule: "I'm asking the same thing again", so the gateway replays the original response. The key also works for actions that have no ID of mine, like charges or cancels, and it usually expires after a while, whereas the ID is permanent.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">When do you actually need an idempotency key?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>I ask "if this runs twice by accident, does something bad happen?" Reads: no key needed. Creating an order: helpful. Anything that moves money, like charges and refunds: essential. One-time developer setup like creating a plan: not needed, I just check and re-run.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Your request to the gateway timed out. Did it fail?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Not necessarily. A timeout means the outcome is <em>unknown</em>: the gateway may have done it and the response got lost. So I retry with the same idempotency key, and if it was created I get the original response back. Or I fetch it by my own ID before creating again.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Which errors do you retry, and how?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Only ones that might be temporary: timeouts, network errors, 5xx and 429. I use the same idempotency key, a small number of attempts, and exponential backoff with jitter so everyone doesn't retry at once. I never retry 4xx errors like 400, 401 or 404; they'll fail the same way again.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">The gateway returns 401. What do you return to your frontend?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Not 401. The gateway's 401 means <em>my server's</em> keys are wrong, but if I pass it through, my frontend thinks the <em>user's</em> session expired, and may log them out or retry the request. I map provider errors to 502 (or 503 for rate limits), log the details, and alert, because broken keys affect everyone.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do gateway rate limits affect your design?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>They're usually per merchant account, not per customer. So one user hammering "create order" can get every customer 429s. I add a per-user rate limit, reuse a recent pending order instead of creating new ones, and back off on 429.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What subscription statuses do you handle, and which give access?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p><code>INITIALIZED</code>: created, not approved yet, no access. <code>BANK_APPROVAL_PENDING</code>: eNACH done, waiting for the bank; I chose to give access. <code>ACTIVE</code>: access. <code>ON_HOLD</code>: a charge failed and is being retried; keep access until the paid period ends. <code>CANCELLED</code> or <code>CUSTOMER_CANCELLED</code>: no more charges, access until the paid period ends. <code>LINK_EXPIRED</code>: never completed. The key idea is that status describes future charges, and access comes from the paid-until date.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What's the "auth amount", and what can go wrong with it?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>It's money taken when the customer approves the mandate. If it equals a full month <em>and</em> the first scheduled charge is immediate, the customer pays twice for month one. If it's a token amount and the first charge is a month later, month one is free. And eNACH can't take an auth amount at all. So I decide the auth amount and the first charge date together, per payment method, and test it in sandbox.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do plans work, and how do you change a price?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>A plan defines the amount and frequency; it's created once per environment, from the dashboard or the API. Plans generally can't be edited, so a price change means a new plan version and pointing new subscriptions at it; existing subscribers stay on the old price. I keep one source of truth for the price, so what I store always matches what the gateway charges.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">For a one-time order, what's the difference between order status and payment status?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>One order can have several payment attempts: UPI fails, then the card succeeds. Payment status is per attempt (SUCCESS, FAILED, USER_DROPPED); order status is the final answer (PAID or EXPIRED). I decide on order status, and record attempts only for history.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do you store money amounts?</span><span class="badge mid">intermediate</span></summary>
+        <div class="answer">
+          <p>Never as floats, because <code>0.1 + 0.2</code> isn't exactly <code>0.3</code>. I use a DECIMAL column, or integers in paise, and always store the currency next to the amount.</p>
+        </div>
+      </details>
+
+      <!-- ================================================================== -->
+      <h2 id="deep">Design and edge cases</h2>
+
+      <details class="qa">
+        <summary><span class="q">Verify and the webhook arrive at the same moment. How do you avoid granting access twice?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>The bug is "read, then write": both read "not granted" and both grant. I make check-and-write a single atomic step: an <code>UPDATE … WHERE id = ? AND not already granted</code>, and only the caller that changed 1 row does the follow-up work. If granting is several steps, I take a lock on the order ID. For renewals, I insert the payment ID into a UNIQUE column; a duplicate insert means it was already counted.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A user double-clicks Subscribe, or opens two tabs. How do you prevent two subscriptions?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Layers. The button is disabled while the request runs. On the server, a per-user lock covers check → create → save, so the second request waits; when it gets in, it finds the pending subscription and reuses its session instead of creating a new one. A database unique constraint on "one pending per user" is the final safety net. Without that, two mandates could both be approved and the user billed twice.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do you handle duplicate and out-of-order webhooks?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>For duplicates: an inbox table with a unique event key, plus exactly-once updates (unique payment IDs, conditional updates). For ordering: I don't trust the payload's status alone. I re-fetch the current status from the gateway and act on that, so a late "activated" can't overwrite a newer "cancelled".</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Processing a webhook throws an error. What do you reply?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>It depends on whether I've stored it. My handler first verifies the signature and saves the raw event to an inbox table. If saving fails, I return 500 so the gateway retries; that's the only copy. If it's saved but processing fails, I return 200 and let my own retry job reprocess it. Always returning 200 <em>without</em> storing the event first silently loses it.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Why reply to a webhook quickly, and how?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>The gateway waits only a few seconds. If I'm slow, it treats the delivery as failed and resends, so slowness creates duplicates. So I verify, store, reply 200, and do the heavy work (API calls, database updates, emails) in the background.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What if webhooks are missed entirely?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>The gateway retries for a while, but if my server was down past all retries, events are lost. So I run a periodic sync job that fetches status for pending and recently active records, and I alert if no webhooks arrive for hours when I normally get some, since that usually means the URL or configuration broke.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">The gateway created the order, but saving to your database failed. Now what?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>That's why the order is: gateway creates, I save, <em>then</em> I return the session ID. If the save fails, I don't return the session, so the customer can't pay. The gateway's order just expires unused. If I'd replied first, the customer could pay for something my database doesn't know about.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A monthly renewal succeeds. How do you extend access?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>One payment means one period. I insert the payment ID into the ledger (UNIQUE); only if it's new do I extend paid-until, in the same transaction. I extend from the <em>old paid-until</em>, not from now: if a retry lands on the 3rd, the period still ends on the 1st of next month, so dates don't drift. The approval-time AUTH payment is the first grant, not a renewal.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A monthly charge fails. What happens to the user?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>I record the failure and notify the user, which is called dunning, but I don't cut access immediately: they've paid until the paid-until date. The gateway usually retries for a few days, and I may allow a short grace period. If a retry succeeds, it's a normal renewal; if retries are exhausted, access ends at paid-until plus grace.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A customer cancels the mandate from their UPI app. How do you find out, and what happens?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Only through a status-changed webhook. I mark it cancelled so I stop expecting charges, but keep access until paid-until, because they paid for that time. In-app cancellation goes through the gateway's cancel API and ends in the same state; if that API call fails, I don't mark it cancelled locally, or they'd keep being charged.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do you turn access off when a subscription expires?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Two options: check paid-until at access time, which is exact but must be in every check; or a scheduled job that downgrades expired users, which keeps checks simple but can be late. I combine them: a job keeps the stored tier correct, important features also check the date, and I alert if the job stops running. The job is written as "set the correct tier", so re-running it is harmless.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A user's trial ends, but they also have access through a family member's plan. What happens?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Nothing should change. If an event simply sets the user to "free", it wipes out other valid access. So whenever anything changes, I recalculate access as the best tier from all still-valid sources: own subscription, trial, family plan.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A failed or abandoned checkout: should it affect the user's access?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>No. Mark the <em>order</em> failed, never downgrade the <em>person</em>. An existing subscriber who starts checkout for another plan and abandons it must keep what they already paid for.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">The verify call sees "not completed yet". Is that a failure?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>No. <code>INITIALIZED</code> can mean "gave up" or "approving in their UPI app right now"; one check can't tell. I reply "pending", change nothing, and the frontend re-checks every few seconds for about a minute. The final answer comes from the webhook, or from the session expiry: after the checkout link expires, it can't complete, so a cleanup job marks it abandoned.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do you deliver a one-time purchase exactly once?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>For entitlements, I write the update so repeating it changes nothing: <code>slots = max(slots, 3)</code>, not <code>slots + 1</code>. For issued items like coupons, I put a UNIQUE constraint on the order ID in the coupons table, so one order can only ever produce one coupon; a duplicate means "return the existing one". Before delivering I also confirm the order is PAID and the amount matches what I stored.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How would you generate and redeem coupon codes safely?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Generate with crypto randomness, not <code>Math.random()</code>, 8–12 characters, uppercase, avoiding look-alikes like 0/O and 1/l. Put UNIQUE on the code and retry on collision. Store owner and expiry. Redeem with one atomic update, <code>SET used = 1 WHERE code = ? AND used = 0 AND owner matches AND not expired</code>, and continue only if one row changed, so two quick clicks can't use it twice.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">The user paid, but by the time the payment landed they're no longer eligible. What do you do?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Once money is taken, either deliver what was paid for or refund it, and log which. Never silently keep the money. Which one is a product decision; for example, paying twice for the same slot from two tabs means refunding the second.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What is a replay attack on webhooks, and how do you prevent it?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Someone captures a real, correctly signed webhook and re-sends it later, for example to trigger "payment success" again. The signature is still valid, so I also reject events whose timestamp is too old, say beyond 5 minutes, and my processing is idempotent anyway.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How would you scale this to millions of orders?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <ul>
+            <li>One shared gateway client with keep-alive connections, timeouts and one error mapper.</li>
+            <li>Per-user rate limits and reuse of pending orders, to protect the merchant-wide gateway limit.</li>
+            <li>Per-user locks rather than global ones, so users never wait on each other.</li>
+            <li>Webhooks stored in an inbox and processed by a queue or workers.</li>
+            <li>Indexes on order ID, gateway ID and payment ID.</li>
+            <li>Idempotency everywhere, and structured logs, metrics and alerts.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What would you monitor and alert on?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>Create, verify and webhook rates and their success ratio; gateway latency and error codes; 429s; conversion (orders created vs paid); inbox backlog; signature failures. Alerts for any burst of 401/404 from the gateway (configuration broken for everyone), database save failures after a successful create, the expiry job not running, and webhook silence.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do you test a payment integration?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>In sandbox: every payment method, including exactly when month one is charged. Then the unhappy paths: abandoned checkout, failed payment, double-click and two tabs, the same webhook twice, webhooks out of order, a bad signature, a gateway timeout, a mobile return on a real device. And before go-live: real prices, live keys, production webhook and return URLs.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What goes wrong with payments inside a mobile webview app?</span><span class="badge deep">deep</span></summary>
+        <div class="answer">
+          <p>The webview may open checkout in the system browser, so the return URL lands in the browser where the user isn't logged in, and verify fails even though they paid. The fix is the gateway's native SDK, or an in-app browser plus a deep link back into the app. The webhook still grants access, but the experience is confusing, so I test it on a real device.</p>
+        </div>
+      </details>
+
+      <!-- ================================================================== -->
+      <h2 id="scenarios">"What would you do if…" scenarios</h2>
+      <p>Debugging questions. Show a calm, step-by-step approach: <strong>find the facts → fix the user → fix the cause</strong>.</p>
+
+      <details class="qa">
+        <summary><span class="q">A user says "I paid but I don't have access".</span><span class="badge mid">scenario</span></summary>
+        <div class="answer">
+          <ol>
+            <li>Find their order and fetch its real status from the gateway.</li>
+            <li>If it's paid or active: check my logs and webhook inbox for whether verify ran and the webhook arrived. Grant access by re-running my normal grant path, which is idempotent, so it's safe.</li>
+            <li>If it's not paid: show them that, and check whether it's a pending eNACH.</li>
+            <li>Then find the cause: a webhook failure, a verify bug, a mobile return issue. Add an alert or sync job so it can't happen silently again.</li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">A customer was charged twice.</span><span class="badge mid">scenario</span></summary>
+        <div class="answer">
+          <ol>
+            <li>Check the gateway: two separate payments, or one shown twice?</li>
+            <li>If there really are two: refund one immediately and tell the customer.</li>
+            <li>Find how. Two subscriptions from a double-click? Auth amount plus an immediate first charge? A retry without an idempotency key?</li>
+            <li>Fix that root cause with a lock or reuse, the first-charge settings, or idempotency keys, and check whether other customers were affected.</li>
+          </ol>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Suddenly every payment fails with an error from the gateway.</span><span class="badge mid">scenario</span></summary>
+        <div class="answer">
+          <p>Look at the status code. A 401 means keys or environment: a rotated secret, or sandbox keys deployed to production. A 404 means a plan ID or URL is wrong. 5xx means the gateway is down: check their status page, show users a friendly "try again shortly", and wait. A 429 means I'm over the rate limit; find which client is flooding. This is why I alert on bursts of these codes.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Webhooks stopped arriving.</span><span class="badge mid">scenario</span></summary>
+        <div class="answer">
+          <p>Check the gateway dashboard's webhook delivery logs: are they being sent, and what response does my server give? Common causes: the URL changed after a deploy, a proxy or firewall blocking it, signature failures after a secret rotation, or the endpoint now requiring login. Meanwhile, run the sync job to catch up on missed status changes.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Users see "verification failed" but they actually paid.</span><span class="badge mid">scenario</span></summary>
+        <div class="answer">
+          <p>Most likely verify treats a not-yet-final status (still <code>INITIALIZED</code>, or a pending UPI approval) as failed. The fix: treat it as pending, poll briefly on the frontend, and let the webhook finish. Also check that a "failed" result never downgrades existing access.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">The gateway is down during your peak hour.</span><span class="badge mid">scenario</span></summary>
+        <div class="answer">
+          <p>New payments can't be taken, so show a clear message instead of raw errors, and avoid retry storms with backoff. Existing users are unaffected because access comes from my database, not live gateway calls. Webhooks will arrive late once it recovers, and my idempotent handlers and sync job catch up. Longer term: a status page check, and possibly a second gateway as fallback for one-time payments.</p>
+        </div>
+      </details>
+
+      <!-- ================================================================== -->
+      <h2 id="my-project">About my project</h2>
+      <p>Answers in first person about the platform I built: a fintech product with subscription tiers, family sharing, and paid add-ons. Adapt the wording, keep it honest.</p>
+
+      <details class="qa">
+        <summary><span class="q">Tell me about the payment system you built.</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>I integrated Cashfree into a fintech platform with three monthly tiers (Starter, Growth, Pro). Subscriptions use Cashfree Subscriptions, so customers approve a mandate once with UPI AutoPay, a card or eNACH, and are charged monthly. There are also one-time purchases through Cashfree orders: extra family member slots and paid report coupons.</p>
+          <p>On the backend I built order creation, a verify endpoint for when users return, and a signed webhook handler that grants access, renews monthly and handles cancellations. The main design goal was that every grant happens exactly once, even when verify and webhooks overlap or repeat.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">Why Cashfree?</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>It's an Indian aggregator with strong support for recurring payments, including UPI AutoPay and eNACH, which matter for Indian users. It has one API for both subscriptions and one-time orders, a sandbox, and webhooks for the full subscription lifecycle. Pricing and onboarding were also factors. The design itself isn't tied to Cashfree; the same patterns would work with Razorpay or Stripe.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How does access control work on your platform?</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>It mixes three models. Plan tiers act like roles (RBAC): a feature needs Growth or higher. Family sharing is relationship-based (ReBAC): a member inherits access from the owner's paid plan. And usage rules are attribute-based (ABAC): for example, report generation checks the tier, the current billing cycle, how many reports were used this cycle, and whether a coupon is valid, unused and owned by this user.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What was the hardest problem you solved?</span><span class="badge deep">project</span></summary>
+        <div class="answer">
+          <p>Pick one and tell it as a story: problem → why it was subtle → fix.</p>
+          <ul>
+            <li><strong>Double grants:</strong> verify and the webhook arriving together could both grant access. I fixed it with atomic conditional updates and unique payment IDs.</li>
+            <li><strong>"Failed" that wasn't:</strong> users returning before finishing UPI approval saw "verification failed". I introduced a pending state with polling and let webhooks give the final answer.</li>
+            <li><strong>An abandoned attempt removing access:</strong> marking a failed new attempt also downgraded existing subscribers. I changed failures to affect only that order.</li>
+            <li><strong>Webhook security:</strong> unsigned webhooks would have let someone fake renewals, so missing signatures are now rejected and timestamps checked.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How did you handle a payment that's still pending with the bank (eNACH)?</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>eNACH has a gap where the customer has finished but the bank hasn't confirmed: <code>BANK_APPROVAL_PENDING</code>. I chose to grant access in that state so the first experience isn't "wait a few days", and I tell the user the bank is confirming. If the bank later rejects it, the webhook moves the subscription to failed and access ends. It's a trade-off: a small risk for a much better experience.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How do the one-time purchases work?</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>Before creating the order I check eligibility: for example, family slots only on Starter and only the next slot; report coupons only for paid plans, only if no unused coupon exists, and only after included reports are used. The order ID has a prefix per product so webhooks can be routed. Verify and the webhook share one "grant if paid" function. Slots use a "set to at least N" update, which is naturally safe to repeat; coupons are unique per order, so one payment can never produce two.</p>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What trade-offs did you make?</span><span class="badge deep">project</span></summary>
+        <div class="answer">
+          <ul>
+            <li><strong>Storing the tier vs computing it:</strong> I store the user's tier for fast checks and update it on payment events and with an expiry job, plus date checks where it matters.</li>
+            <li><strong>Granting access during bank-approval pending:</strong> better experience, small risk.</li>
+            <li><strong>Hosted checkout over a custom UI:</strong> less control over the look, but no card data on my servers.</li>
+            <li><strong>Polling briefly after return:</strong> slightly more requests, but users see success immediately instead of waiting for a webhook.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">What would you improve next?</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>An honest answer shows maturity:</p>
+          <ul>
+            <li>A durable webhook inbox with a worker queue and a retry job.</li>
+            <li>An automated reconciliation report against the gateway's settlements.</li>
+            <li>Proper upgrade and downgrade flows with optional proration.</li>
+            <li>Automated refunds for edge cases like paying twice.</li>
+            <li>A shared gateway client module, with more metrics and alerts.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="qa">
+        <summary><span class="q">How did you test it?</span><span class="badge mid">project</span></summary>
+        <div class="answer">
+          <p>In Cashfree's sandbox with simulated success and failure for each method, plus a short real-money test in production with low-priced plans before setting real prices. I specifically tested double-clicks, abandoned checkouts, repeated webhooks and returning before approval finished. Price and environment checks are on a go-live checklist.</p>
+        </div>
+      </details>
+
+      <!-- ================================================================== -->
+      <h2 id="quickfire">Quick-fire revision</h2>
+      <p>One-line answers for rapid revision.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Question</th><th>One-line answer</th></tr></thead>
+          <tbody>
+            <tr><td>Who decides if a payment succeeded?</td><td>My server, by asking the gateway, never the browser.</td></tr>
+            <tr><td>Is the return URL proof of payment?</td><td>No. It only triggers verification.</td></tr>
+            <tr><td>Where do secret keys live?</td><td>Server only, in env vars or a secrets manager, never in frontend or logs.</td></tr>
+            <tr><td>Retry a 400?</td><td>No. Only timeouts, network errors, 5xx and 429.</td></tr>
+            <tr><td>Timeout means failed?</td><td>No. Unknown; retry with the same idempotency key.</td></tr>
+            <tr><td>Idempotency key on a GET?</td><td>Not needed; reads are naturally safe.</td></tr>
+            <tr><td>How long are idempotency keys kept?</td><td>Usually a short window (often about 24h); check the gateway's docs.</td></tr>
+            <tr><td>Webhook security?</td><td>HMAC signature on the raw body + timestamp check; reject if missing.</td></tr>
+            <tr><td>Duplicate webhook?</td><td>Inbox unique key + exactly-once updates.</td></tr>
+            <tr><td>Out-of-order webhook?</td><td>Re-fetch live status before acting.</td></tr>
+            <tr><td>Grant exactly once?</td><td>Conditional update / lock / unique key.</td></tr>
+            <tr><td>Renewal extends from?</td><td>Old paid-until, not now.</td></tr>
+            <tr><td>Cancel means no access?</td><td>No. No more charges; access until paid-until.</td></tr>
+            <tr><td>Pending means failed?</td><td>No. Reply pending, change nothing.</td></tr>
+            <tr><td>Failed order downgrades the user?</td><td>Never. Mark the order, not the person.</td></tr>
+            <tr><td>Money type in the DB?</td><td>DECIMAL or integer paise, plus currency.</td></tr>
+            <tr><td>Price from the client?</td><td>Never. Plan key only; price from server config.</td></tr>
+            <tr><td>Save before or after replying?</td><td>Save first, then return the session ID.</td></tr>
+            <tr><td>Gateway 401 to your frontend?</td><td>Map it to 502 and alert.</td></tr>
+            <tr><td>Double-click protection?</td><td>Disabled button + per-user lock + reuse pending + unique constraint.</td></tr>
+            <tr><td>Coupon code randomness?</td><td>Crypto RNG, 8–12 chars, unique, atomic redeem.</td></tr>
+            <tr><td>Paid but no longer eligible?</td><td>Deliver or refund; never keep silently.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="10-one-time-payments.html"><small>← Previous</small><span>One-time payments: add-ons and coupons</span></a>
+        <a class="next" href="index.html"><small>Back to</small><span>Chapter overview</span></a>
+      </nav>
+    </main>
+  </div>
+
+  <script>
+    document.querySelectorAll('[data-qa]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var open = btn.getAttribute('data-qa') === 'open';
+        document.querySelectorAll('details.qa').forEach(function (d) { d.open = open; });
+      });
+    });
+  </script>
+
+</body>
+</html>

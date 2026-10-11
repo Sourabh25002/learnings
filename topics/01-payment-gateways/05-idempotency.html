@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Idempotency</title>
+  <meta name="description" content="Lesson 5: the lost-response problem, idempotency keys vs unique IDs, how it works inside, and when it matters.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html" aria-current="page">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 5</p>
+      <h1>Idempotency</h1>
+      <p class="lead">
+        A long word for a simple idea: asking for the same thing twice should have the same
+        effect as asking once. In payments, this is what makes retries safe.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#problem">The problem: the lost response</a></li>
+          <li><a href="#meaning">What idempotent means</a></li>
+          <li><a href="#two-protections">Unique ID vs idempotency key</a></li>
+          <li><a href="#inside">How it works inside</a></li>
+          <li><a href="#walkthrough">Walkthrough: four retry scenarios</a></li>
+          <li><a href="#why-separate">Why not just use the unique ID?</a></li>
+          <li><a href="#rules">Rules for using keys</a></li>
+          <li><a href="#when">When it really matters</a></li>
+          <li><a href="#your-side">Your side needs it too</a></li>
+        </ol>
+      </div>
+
+      <h2 id="problem">The problem: the lost response</h2>
+      <p>Your server asks the gateway to create something. The gateway does it, but the reply never reaches you.</p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 330" role="img" aria-label="A create request succeeds but its response is lost; a retry with the same key gets the saved response">
+            <defs>
+              <marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+              <marker id="ah5ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head ok"/>
+              </marker>
+            </defs>
+
+            <rect x="60" y="10" width="180" height="40" rx="8" class="d-box accent"/>
+            <text x="150" y="35" text-anchor="middle" class="d-text">Your backend</text>
+            <rect x="520" y="10" width="180" height="40" rx="8" class="d-box"/>
+            <text x="610" y="35" text-anchor="middle" class="d-text">Gateway</text>
+
+            <line x1="150" y1="50" x2="150" y2="320" class="d-life"/>
+            <line x1="610" y1="50" x2="610" y2="320" class="d-life"/>
+
+            <line x1="150" y1="82" x2="607" y2="82" class="d-line" marker-end="url(#ah5)"/>
+            <text x="380" y="74" text-anchor="middle" class="d-small">① Create sub_42   (key K1)</text>
+
+            <rect x="530" y="96" width="160" height="28" rx="6" class="d-box ok"/>
+            <text x="610" y="115" text-anchor="middle" class="d-small">creates sub_42 ✓</text>
+
+            <line x1="610" y1="160" x2="400" y2="160" class="d-line d-dash bad"/>
+            <text x="384" y="166" text-anchor="middle" class="d-text d-label-bad" style="font-size:20px">✕</text>
+            <text x="505" y="152" text-anchor="middle" class="d-small d-label-bad">② response lost (timeout)</text>
+            <text x="265" y="166" text-anchor="middle" class="d-muted">backend: "did it work??"</text>
+
+            <line x1="150" y1="210" x2="607" y2="210" class="d-line" marker-end="url(#ah5)"/>
+            <text x="380" y="202" text-anchor="middle" class="d-small">③ Retry: same request, same key K1</text>
+
+            <rect x="490" y="224" width="240" height="28" rx="6" class="d-box accent"/>
+            <text x="610" y="243" text-anchor="middle" class="d-small">seen K1 before → don't create again</text>
+
+            <line x1="610" y1="290" x2="153" y2="290" class="d-line d-dash ok" marker-end="url(#ah5ok)"/>
+            <text x="380" y="282" text-anchor="middle" class="d-small d-label-ok">④ the saved original response ✓</text>
+          </svg>
+        </div>
+        <figcaption>Without step ③'s key, the retry would either create a duplicate or fail with "already exists".</figcaption>
+      </figure>
+
+      <p>
+        Your server is stuck: it doesn't know whether the subscription exists. Retrying blindly might
+        create a second one. Not retrying leaves the customer with an error even though everything
+        worked. Idempotency solves exactly this.
+      </p>
+
+      <h2 id="meaning">What idempotent means</h2>
+      <p>An action is <strong>idempotent</strong> if doing it many times gives the same result as doing it once.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Action</th><th>Idempotent?</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Read a subscription's status</td><td class="yes">Naturally</td><td>Reading changes nothing.</td></tr>
+            <tr><td>"Set status to CANCELLED"</td><td class="yes">Mostly</td><td>Cancelled twice is still cancelled; the second call may just error.</td></tr>
+            <tr><td>"Create a subscription"</td><td class="no">No</td><td>Each call makes a new one.</td></tr>
+            <tr><td>"Charge ₹499"</td><td class="no">No</td><td>Each call takes money again.</td></tr>
+            <tr><td>"Add 1 month to access"</td><td class="no">No</td><td>Twice gives two months.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The non-idempotent ones need protection, and that's what an <strong>idempotency key</strong> provides.</p>
+
+      <h2 id="two-protections">Unique ID vs idempotency key</h2>
+      <p>When creating a subscription you send two values that both look like "unique IDs". They do different jobs:</p>
+      <div class="split">
+        <div>
+          <h4>Your subscription ID</h4>
+          <p>A <strong>business rule</strong>: "no two subscriptions may share this ID".</p>
+          <p>Send it again → <span class="no">error: already exists</span>.</p>
+          <p>Lasts forever.</p>
+        </div>
+        <div>
+          <h4>Idempotency key</h4>
+          <p>A <strong>retry rule</strong>: "I'm asking the same thing again".</p>
+          <p>Send it again with the same request → <span class="yes">the original response, replayed</span>.</p>
+          <p>Kept only for a short time.</p>
+        </div>
+      </div>
+      <div class="analogy">
+        <p>
+          Your subscription ID is like a <strong>passport number</strong>: it identifies one thing,
+          forever, and no two can match. The idempotency key is like a <strong>receipt number</strong>
+          at a counter: show the same receipt again and the clerk says "already done, here's your copy",
+          instead of doing the work twice.
+        </p>
+      </div>
+      <p>The key itself is <strong>just a string you generate</strong>, usually a random UUID. Nothing special about it except how the gateway treats it.</p>
+
+      <h2 id="inside">How it works inside</h2>
+      <div class="callout">
+        <span class="callout-title">Context</span>
+        <p>Gateways don't publish their internals. This is the common industry pattern (Stripe documents it openly), and it's the right mental model.</p>
+      </div>
+      <p>Picture two separate tables at the gateway:</p>
+
+      <h3>Table 1: subscriptions (the real data)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>subscription_id (unique)</th><th>customer</th><th>status</th></tr></thead>
+          <tbody>
+            <tr><td><code>sub_42</code></td><td>Priya</td><td><code>INITIALIZED</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Table 2: idempotency notebook (for retries only)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>idempotency_key (unique)</th><th>request fingerprint</th><th>saved response</th><th>expires</th></tr></thead>
+          <tbody>
+            <tr><td><code>K1</code></td><td>hash of the request body</td><td><code>{ session_id: "subs_token_xyz", … }</code></td><td>~24h</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>When a request arrives with a key, the gateway checks the notebook <strong>first</strong>:</p>
+      <ol>
+        <li><strong>Key not in notebook</strong> → new request. Do the work, then save key + fingerprint + response.</li>
+        <li><strong>Key found, same fingerprint</strong> → a retry. Don't touch Table 1; return the saved response.</li>
+        <li><strong>Key found, different fingerprint</strong> → you reused a key for a different request. Reject with <strong>422</strong>.</li>
+      </ol>
+
+      <h2 id="walkthrough">Walkthrough: four retry scenarios</h2>
+      <p>The first request created <code>sub_42</code>, but the response was lost. Now you retry:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Retry sends</th><th>What the gateway does</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Same ID <code>sub_42</code>, same key <code>K1</code></td><td>Finds K1 in the notebook, replays the saved response</td><td class="yes">Success; same session as before</td></tr>
+            <tr><td>Same ID <code>sub_42</code>, <strong>no key</strong></td><td>Tries to insert sub_42, which already exists</td><td class="no">400: already exists</td></tr>
+            <tr><td>Same ID <code>sub_42</code>, <strong>new key</strong> K2</td><td>K2 is new, so it tries to insert sub_42, which exists</td><td class="no">400: already exists</td></tr>
+            <tr><td><strong>New ID</strong> <code>sub_43</code>, no key</td><td>Creates a brand-new subscription</td><td class="maybe">Works; sub_42 is left unused and expires</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="callout-title">Is the leftover sub_42 a problem?</span>
+        <p>
+          For <em>creating</em> a subscription: no. Creating moves no money. The customer only pays on
+          the session you actually open, so the unused one stays <code>INITIALIZED</code> and later
+          expires. Its webhooks (if any) find no matching row in your database and are ignored. It just
+          clutters the dashboard. For <em>charges and refunds</em>, the same mistake means real money
+          moving twice.
+        </p>
+      </div>
+
+      <h3>Without a key, you can still do it by hand</h3>
+      <ol>
+        <li>Send the create request.</li>
+        <li>If it fails with "already exists", <strong>fetch</strong> it by your ID (<code>GET /subscriptions/sub_42</code>).</li>
+        <li>Use the session ID from that response.</li>
+      </ol>
+      <p>It works, but needs an extra call and more error handling. The key does the same in one step.</p>
+
+      <h2 id="why-separate">Why not just use the unique ID?</h2>
+      <p>"If the ID already exists, why not just return it?" Good question. Four reasons it's built separately:</p>
+      <ol>
+        <li><strong>A duplicate ID might be a bug, not a retry.</strong> Two different users accidentally given the same ID, maybe with different plans. Quietly returning the old one would hide a serious problem. The key makes your intent explicit.</li>
+        <li><strong>Many actions have no ID of yours.</strong> "Cancel this subscription" or "charge ₹499" don't create a row with your unique ID. A key works on any request.</li>
+        <li><strong>Many requests per object.</strong> One subscription gets a create, several charges, a cancel, each with its own key. That fits a separate table (many rows), not one column.</li>
+        <li><strong>Different lifetimes.</strong> Subscription data lives forever; retry records are only useful for minutes or hours and can be cleaned up.</li>
+      </ol>
+      <p>For one endpoint, a column would be enough. As a feature across the whole API, a separate table is cleaner.</p>
+
+      <h2 id="rules">Rules for using keys</h2>
+      <ul>
+        <li><strong>One key per action.</strong> Generate a fresh key for each new thing you want done.</li>
+        <li><strong>Reuse it only for an identical retry.</strong> Same endpoint, same body. A different body with the same key gets 422.</li>
+        <li><strong>Never reuse a key for a different action</strong>, e.g. using the "create" key to "cancel". You might get the old create response replayed.</li>
+        <li><strong>Keys expire</strong> (commonly about 24 hours; check your gateway). A retry after expiry is treated as brand new.</li>
+        <li><strong>Usually a UUID.</strong> Docs often ask for UUID format. If you want it tied to your ID, derive it deterministically (UUID v5 of your order ID): the same order always gives the same key.</li>
+        <li><strong>Store it if the retry may happen later.</strong> If retries happen in a background job hours later, save the key with the job so the retry uses the same one.</li>
+      </ul>
+
+      <h2 id="when">When it really matters</h2>
+      <p>Ask: <strong>"If this request runs twice by accident, does something bad happen?"</strong></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Request type</th><th>Example</th><th>Twice by accident</th><th>Key needed?</th></tr></thead>
+          <tbody>
+            <tr><td>Read</td><td>Fetch status</td><td>Same data twice</td><td class="no">No</td></tr>
+            <tr><td>Create</td><td>Create subscription or order</td><td>Duplicate, or "already exists"</td><td class="yes">Helpful</td></tr>
+            <tr><td><strong>Move money</strong></td><td>Charge, refund</td><td><strong>Charged or refunded twice</strong></td><td class="yes">Essential</td></tr>
+            <tr><td>Change state</td><td>Cancel, pause</td><td>Second call errors</td><td class="maybe">Nice to have</td></tr>
+            <tr><td>One-time developer setup</td><td>Create a plan from a script</td><td>"Already exists"; just check and re-run</td><td class="no">Not needed</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="your-side">Your side needs it too</h2>
+      <p>
+        Idempotency isn't only something you ask of the gateway. <strong>Your own endpoints receive
+        repeats</strong> as well:
+      </p>
+      <ul>
+        <li><strong>Webhooks arrive more than once.</strong> Gateways retry until you reply 200, and sometimes send duplicates anyway. Processing "payment succeeded" twice must not extend access twice. Record each gateway payment ID once (a unique column) and skip ones you've seen.</li>
+        <li><strong>Return URL and webhook race.</strong> Both report the same success. Grant access with an atomic "only if not already granted" update.</li>
+        <li><strong>Users double-click.</strong> Your "create" endpoint must not create two subscriptions (<a href="06-creating-an-order.html">Lesson 6</a>).</li>
+      </ul>
+      <p class="keyidea">
+        In a payment system, assume every message can arrive twice, late, or not at all,
+        and design so that none of those cause harm.
+      </p>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="04-talking-to-the-gateway-api.html"><small>← Previous</small><span>Talking to the gateway API</span></a>
+        <a class="next" href="06-creating-an-order.html"><small>Next →</small><span>Creating an order, safely</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

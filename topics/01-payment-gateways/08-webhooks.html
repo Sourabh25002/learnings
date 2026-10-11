@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Webhooks</title>
+  <meta name="description" content="Lesson 8: receiving webhooks safely: signatures, storing events, replying fast, duplicates, ordering and processing exactly once.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html" aria-current="page">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 8</p>
+      <h1>Webhooks</h1>
+      <p class="lead">
+        A webhook is the gateway calling <em>you</em>. It's the only way to hear about things that
+        happen when the customer isn't on your site: monthly charges, failures, cancellations from
+        a UPI app. It's also the safety net when the browser never comes back.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#what">What a webhook is</a></li>
+          <li><a href="#setup">Setting it up</a></li>
+          <li><a href="#pipeline">The handler in four steps</a></li>
+          <li><a href="#signature">Step 1: check the signature</a></li>
+          <li><a href="#store">Step 2: store the event</a></li>
+          <li><a href="#reply">Step 3: reply fast</a></li>
+          <li><a href="#process">Step 4: process it</a></li>
+          <li><a href="#reality">Delivery reality: late, twice, out of order</a></li>
+          <li><a href="#status-code">What to reply when something breaks</a></li>
+          <li><a href="#events">Event cheat sheet</a></li>
+          <li><a href="#ops">Monitoring and testing</a></li>
+          <li><a href="#edge-cases">Edge case index</a></li>
+        </ol>
+      </div>
+
+      <h2 id="what">What a webhook is</h2>
+      <p>
+        Normally your server calls the gateway. A webhook is the reverse: when something happens, the
+        <strong>gateway sends an HTTP POST to a URL on your server</strong>, with a JSON body describing
+        the event.
+      </p>
+      <div class="analogy">
+        <p>
+          Polling is calling the courier every 10 minutes asking "is my parcel here yet?". A webhook is
+          the courier <strong>ringing your doorbell</strong> when it arrives. But anyone can ring a
+          doorbell, so you must check who's at the door before opening it.
+        </p>
+      </div>
+
+      <h2 id="setup">Setting it up</h2>
+      <ul>
+        <li><strong>One URL per environment</strong>, set in the gateway dashboard: sandbox points at your test server, production at your live one.</li>
+        <li><strong>Public and https.</strong> The gateway must be able to reach it. It must not require your users' login token, because the gateway has none. Security comes from the signature instead.</li>
+        <li><strong>Choose the webhook version</strong> that matches your API version, so payload fields match the docs you read.</li>
+        <li><strong>Subscribe to the events you need</strong> (subscription events, and payment events for one-time orders).</li>
+      </ul>
+
+      <h2 id="pipeline">The handler in four steps</h2>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 245" role="img" aria-label="Webhook handler pipeline: check signature, store event, reply 200, then process">
+            <defs>
+              <marker id="ah8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+              <marker id="ah8ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head ok"/>
+              </marker>
+            </defs>
+
+            <rect x="10" y="40" width="110" height="60" rx="8" class="d-box"/>
+            <text x="65" y="66" text-anchor="middle" class="d-text">Gateway</text>
+            <text x="65" y="84" text-anchor="middle" class="d-muted">POST event</text>
+
+            <rect x="145" y="40" width="130" height="60" rx="8" class="d-box accent"/>
+            <text x="210" y="66" text-anchor="middle" class="d-text">① Check</text>
+            <text x="210" y="84" text-anchor="middle" class="d-muted">signature</text>
+
+            <rect x="300" y="40" width="130" height="60" rx="8" class="d-box accent"/>
+            <text x="365" y="66" text-anchor="middle" class="d-text">② Store</text>
+            <text x="365" y="84" text-anchor="middle" class="d-muted">raw event</text>
+
+            <rect x="455" y="40" width="110" height="60" rx="8" class="d-box ok"/>
+            <text x="510" y="66" text-anchor="middle" class="d-text">③ Reply</text>
+            <text x="510" y="84" text-anchor="middle" class="d-muted">200 OK</text>
+
+            <rect x="590" y="30" width="160" height="80" rx="8" class="d-box accent"/>
+            <text x="670" y="54" text-anchor="middle" class="d-text">④ Process</text>
+            <text x="670" y="74" text-anchor="middle" class="d-muted">re-fetch real status</text>
+            <text x="670" y="92" text-anchor="middle" class="d-muted">apply exactly once</text>
+
+            <line x1="120" y1="70" x2="143" y2="70" class="d-line" marker-end="url(#ah8)"/>
+            <line x1="275" y1="70" x2="298" y2="70" class="d-line" marker-end="url(#ah8)"/>
+            <line x1="430" y1="70" x2="453" y2="70" class="d-line" marker-end="url(#ah8)"/>
+            <line x1="565" y1="70" x2="588" y2="70" class="d-line d-dash" marker-end="url(#ah8)"/>
+            <text x="577" y="128" text-anchor="middle" class="d-muted">then, in the</text>
+            <text x="577" y="142" text-anchor="middle" class="d-muted">background</text>
+
+            <line x1="210" y1="100" x2="210" y2="148" class="d-line" marker-end="url(#ah8)"/>
+            <rect x="145" y="150" width="130" height="44" rx="8" class="d-box bad"/>
+            <text x="210" y="170" text-anchor="middle" class="d-small">invalid → reject</text>
+            <text x="210" y="186" text-anchor="middle" class="d-muted">401, do nothing</text>
+
+            <line x1="365" y1="100" x2="365" y2="148" class="d-line" marker-end="url(#ah8)"/>
+            <rect x="300" y="150" width="130" height="44" rx="8" class="d-box"/>
+            <text x="365" y="170" text-anchor="middle" class="d-small">seen before?</text>
+            <text x="365" y="186" text-anchor="middle" class="d-muted">200, skip</text>
+
+            <path d="M510 100 V222 H65 V103" class="d-line d-dash ok" marker-end="url(#ah8ok)"/>
+            <text x="300" y="238" text-anchor="middle" class="d-small d-label-ok">reply within a few seconds</text>
+          </svg>
+        </div>
+        <figcaption>Steps ①–③ are quick and happen while the gateway waits. Step ④ does the real work afterwards.</figcaption>
+      </figure>
+
+      <h2 id="signature">Step 1: check the signature</h2>
+      <p>
+        Your webhook URL is public. Anyone who finds it could POST
+        <code>{"type": "PAYMENT_SUCCESS", …}</code>. The signature proves the message really came from
+        the gateway and wasn't changed on the way.
+      </p>
+
+      <h3>How it works (in plain words)</h3>
+      <ol>
+        <li>You and the gateway share a <strong>secret</strong> (usually your API secret key).</li>
+        <li>The gateway mixes the secret with the exact message (timestamp + body) using <strong>HMAC-SHA256</strong>, a one-way "fingerprint" function. It sends the result in a header, e.g. <code>x-webhook-signature</code>, plus the timestamp in <code>x-webhook-timestamp</code>.</li>
+        <li>You compute the same fingerprint yourself from the timestamp, the body you received and your copy of the secret.</li>
+        <li><strong>They match:</strong> it's genuine. <strong>They don't:</strong> reject it.</li>
+      </ol>
+      <div class="analogy">
+        <p>
+          It's a wax seal that only you and the gateway know how to make. A forger can copy the letter,
+          but without the secret they can't produce the right seal, and if they change one word, the
+          seal no longer matches.
+        </p>
+      </div>
+
+      <h3>Getting it right</h3>
+      <ul>
+        <li><strong>Use the raw body, byte for byte.</strong> If your framework parses the JSON and you re-stringify it, spacing or key order can change, and the fingerprint won't match. Capture the raw body before parsing.</li>
+        <li><strong>Missing signature headers = reject.</strong> Never "process anyway". That would let anyone forge an event just by leaving the headers out.</li>
+        <li><strong>Missing raw body or secret on your side = reject (and alert).</strong> It's a bug or misconfiguration, not a reason to skip security.</li>
+        <li><strong>Check the timestamp is recent</strong> (e.g. within 5 minutes). This blocks <em>replay attacks</em>: someone capturing a real, correctly signed webhook and re-sending it later.</li>
+        <li><strong>Compare in constant time</strong> (e.g. <code>crypto.timingSafeEqual</code>) so attackers can't learn the signature from response timing.</li>
+      </ul>
+
+      <div class="callout edge">
+        <span class="callout-title">Edge case: the free-renewal attack</span>
+        <p>
+          If unsigned webhooks are accepted, a user who knows their own subscription ID (it's in their
+          browser) can POST a fake "monthly charge succeeded" event, again and again, and get months of
+          access for free. Signature checking isn't optional.
+        </p>
+      </div>
+
+      <h2 id="store">Step 2: store the event</h2>
+      <p>Before doing any work, save the event to an <strong>inbox table</strong>:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Column</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>event_key</code> (UNIQUE)</td><td>Something that identifies this event, e.g. a gateway event ID, or a hash of type + IDs + payment status. A duplicate insert means "seen it already".</td></tr>
+            <tr><td><code>type</code></td><td>e.g. <code>SUBSCRIPTION_PAYMENT_SUCCESS</code></td></tr>
+            <tr><td><code>raw_body</code></td><td>The exact payload, for debugging and re-processing</td></tr>
+            <tr><td><code>received_at</code> / <code>processed_at</code></td><td>When it came in, when it was handled</td></tr>
+            <tr><td><code>status</code> + <code>attempts</code> + <code>last_error</code></td><td>pending / done / failed, so failures can be retried by a job</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>What this gives you:</p>
+      <ul>
+        <li><strong>Nothing is lost.</strong> If processing crashes, the event is still saved and can be retried.</li>
+        <li><strong>Duplicates are easy to spot.</strong> The unique key catches them.</li>
+        <li><strong>An audit trail.</strong> "What exactly did the gateway tell us on 3 March?" has an answer.</li>
+        <li><strong>Replay.</strong> After fixing a bug, re-run the stored events.</li>
+      </ul>
+
+      <h2 id="reply">Step 3: reply fast</h2>
+      <p>
+        The gateway waits only a few seconds for your reply. If you're slow, it marks the delivery as
+        failed and sends it <strong>again later</strong>. Slow handlers therefore create their own
+        duplicates.
+      </p>
+      <ul>
+        <li>Reply <strong>200</strong> as soon as the event is safely stored.</li>
+        <li>Do the heavy work (calling the gateway API, updating the database, sending emails) <strong>after</strong> replying: in a background job or queue, or at least without blocking the response.</li>
+        <li>Small apps often process inline and reply after. That's fine while processing is quick and the inbox exists as a backup.</li>
+      </ul>
+
+      <h2 id="process">Step 4: process it</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Route by event type</span>
+          <span class="step-body">Subscription events and one-time payment events go to different handlers. For one-time orders, route by your <strong>order ID prefix</strong> (e.g. <code>slot…</code> → family slots, <code>rptc_…</code> → coupons). This is why prefixes matter (<a href="06-creating-an-order.html#request">Lesson 6</a>).</span>
+        </li>
+        <li>
+          <span class="step-title">Find your record</span>
+          <span class="step-body">By your own ID first, then by the gateway's ID. Not found? Log it and acknowledge: it may be an abandoned attempt that was never saved, or another environment's event.</span>
+        </li>
+        <li>
+          <span class="step-title">Re-fetch the real status</span>
+          <span class="step-body">Ask the gateway for the current state instead of trusting the payload alone. This fixes out-of-order delivery: you always act on the <em>latest</em> truth, not on whichever event happened to arrive last.</span>
+        </li>
+        <li>
+          <span class="step-title">Apply exactly once</span>
+          <span class="step-body">Same tools as verify: a conditional update, a lock, or a unique key per payment ID (<a href="07-verifying-a-payment.html#once">Lesson 7</a>).</span>
+        </li>
+        <li>
+          <span class="step-title">Mark the inbox row done</span>
+          <span class="step-body">Or failed, with the error, so a retry job can pick it up.</span>
+        </li>
+      </ol>
+
+      <h2 id="reality">Delivery reality: late, twice, out of order</h2>
+      <p class="keyidea">Every webhook can arrive late, more than once, out of order, or not at all. Design for all four.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>What happens</th><th>Why</th><th>Your defence</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Duplicates</strong></td><td>Gateway retries after a slow or failed reply; network quirks</td><td>Inbox unique key; per-payment unique key; conditional updates</td></tr>
+            <tr><td><strong>Out of order</strong></td><td>"Cancelled" arrives before "activated"; deliveries run in parallel</td><td>Re-fetch the live status; never let an older state overwrite a newer one</td></tr>
+            <tr><td><strong>Late</strong></td><td>Gateway queues, outages, retries</td><td>Verify covers the user-facing moment; webhooks catch up later</td></tr>
+            <tr><td><strong>Missing</strong></td><td>Your server was down past all retries; misconfigured URL</td><td>A periodic sync job that fetches status for pending or recently active records</td></tr>
+            <tr><td><strong>Forged</strong></td><td>Someone found your URL</td><td>Signature + timestamp checks</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="status-code">What to reply when something breaks</h2>
+      <p>Your reply code tells the gateway whether to try again. Choose deliberately:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Situation</th><th>Reply</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Stored (and processed) fine</td><td><strong>200</strong></td><td>Done.</td></tr>
+            <tr><td>Duplicate we've seen</td><td><strong>200</strong></td><td>Don't make them retry something already handled.</td></tr>
+            <tr><td>Bad or missing signature</td><td><strong>401 / 400</strong></td><td>Not from the gateway; nothing to retry.</td></tr>
+            <tr><td>Unknown order / irrelevant event</td><td><strong>200</strong></td><td>Retrying won't change anything.</td></tr>
+            <tr><td>Couldn't even store it (database down)</td><td><strong>500</strong></td><td>You <em>want</em> a retry. It's the only copy.</td></tr>
+            <tr><td>Stored, but processing failed</td><td><strong>200</strong></td><td>It's safe in your inbox; your own retry job handles it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="callout-title">Watch out: "always reply 200"</span>
+        <p>
+          Replying 200 even when you couldn't store or process an event avoids retry storms, but
+          <strong>silently loses the event</strong>. That's only acceptable if you've stored it first.
+          The inbox is what makes "200 on processing errors" safe.
+        </p>
+      </div>
+
+      <h2 id="events">Event cheat sheet</h2>
+      <p>Names are Cashfree's; other gateways have equivalents.</p>
+      <h3>Subscription events</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Event</th><th>Means</th><th>Do</th></tr></thead>
+          <tbody>
+            <tr><td><code>SUBSCRIPTION_AUTH_STATUS</code></td><td>Mandate approval finished, success or failure</td><td>Success + ACTIVE/bank-pending → grant once. Failed → mark <em>this</em> subscription failed.</td></tr>
+            <tr><td><code>SUBSCRIPTION_PAYMENT_SUCCESS</code> (AUTH)</td><td>The approval-time payment went through</td><td>Grant if not granted yet. Never renew.</td></tr>
+            <tr><td><code>SUBSCRIPTION_PAYMENT_SUCCESS</code> (CHARGE)</td><td>A monthly charge went through</td><td>Record the payment; extend one period <strong>per new payment ID</strong> (<a href="09-renewals-and-cancellations.html#renewal">Lesson 9</a>).</td></tr>
+            <tr><td><code>SUBSCRIPTION_PAYMENT_FAILED</code></td><td>A charge failed; the gateway may retry</td><td>Record it; notify the user; don't revoke yet.</td></tr>
+            <tr><td><code>SUBSCRIPTION_STATUS_CHANGED</code></td><td>Status moved (ACTIVE, ON_HOLD, CANCELLED…)</td><td>Re-fetch and update. Cancelled → stop renewals, keep access until paid-until.</td></tr>
+            <tr><td>Notification, refund, card-expiry reminder events</td><td>Informational</td><td>Log; optionally notify the user.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3>One-time payment events</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Event</th><th>Means</th><th>Do</th></tr></thead>
+          <tbody>
+            <tr><td><code>PAYMENT_SUCCESS_WEBHOOK</code></td><td>An order was paid</td><td>Route by order prefix; verify with Get Order; fulfil exactly once.</td></tr>
+            <tr><td><code>PAYMENT_FAILED_WEBHOOK</code></td><td>One payment attempt failed</td><td>Record the attempt; the <em>order</em> may still be paid by a later attempt.</td></tr>
+            <tr><td><code>PAYMENT_USER_DROPPED_WEBHOOK</code></td><td>Customer left checkout</td><td>Record it; don't treat it as a final order failure.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="ops">Monitoring and testing</h2>
+      <h3>Monitor</h3>
+      <ul>
+        <li>Events received per type per hour, and signature failures (a spike may mean an attack, or a rotated secret).</li>
+        <li>Inbox backlog: events stuck in pending or failed.</li>
+        <li><strong>Silence:</strong> zero webhooks for hours when you normally get some usually means the URL or configuration broke. Alert on it.</li>
+      </ul>
+      <h3>Test</h3>
+      <ul>
+        <li>Use the gateway's sandbox to trigger real events. For local development, a tunnel (e.g. ngrok) gives your laptop a public URL.</li>
+        <li>Send the <strong>same event twice</strong>: nothing should change the second time.</li>
+        <li>Send events <strong>in the wrong order</strong>: the final state must still be right.</li>
+        <li>Send an event with a <strong>bad or missing signature</strong>: it must be rejected.</li>
+      </ul>
+
+      <h2 id="edge-cases">Edge case index</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Edge case</th><th>Handled by</th></tr></thead>
+          <tbody>
+            <tr><td>Forged "payment success"</td><td>Signature check; missing headers rejected</td></tr>
+            <tr><td>Real webhook replayed later</td><td>Timestamp freshness check</td></tr>
+            <tr><td>Same event delivered twice</td><td>Inbox unique key + exactly-once updates</td></tr>
+            <tr><td>Same monthly charge reported twice</td><td>Renew per new payment ID only</td></tr>
+            <tr><td>Events arrive out of order</td><td>Re-fetch live status before acting</td></tr>
+            <tr><td>Slow handler causes retries</td><td>Store, reply 200, process after</td></tr>
+            <tr><td>Processing crashes halfway</td><td>Inbox row stays failed → retry job</td></tr>
+            <tr><td>Your server was down for hours</td><td>Gateway retries + periodic sync job</td></tr>
+            <tr><td>Event for an order you never saved</td><td>Log + 200 (abandoned attempt)</td></tr>
+            <tr><td>Failed attempt on a one-time order</td><td>Record attempt; don't fail the whole order</td></tr>
+            <tr><td>Webhook URL silently broken</td><td>"No webhooks for X hours" alert</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="07-verifying-a-payment.html"><small>← Previous</small><span>Verifying a payment</span></a>
+        <a class="next" href="09-renewals-and-cancellations.html"><small>Next →</small><span>Renewals, failures and cancellations</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verifying a Payment</title>
+  <meta name="description" content="Lesson 7: after checkout, finding out whether the customer really paid, and granting access exactly once.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html" aria-current="page">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 7</p>
+      <h1>Verifying a payment</h1>
+      <p class="lead">
+        The customer is back from checkout. Two questions remain: did they really pay,
+        and if so, how do we give them what they paid for exactly once, even if
+        everything arrives twice?
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#job">What verify is for</a></li>
+          <li><a href="#return">The return handler</a></li>
+          <li><a href="#steps">Verify, step by step</a></li>
+          <li><a href="#final">Final vs not-final statuses</a></li>
+          <li><a href="#pending">"Still in progress": what the user sees</a></li>
+          <li><a href="#once">Granting exactly once</a></li>
+          <li><a href="#ledger">Recording the payments</a></li>
+          <li><a href="#never">Things verify must never do</a></li>
+          <li><a href="#responses">What verify returns</a></li>
+          <li><a href="#frontend">The frontend side</a></li>
+          <li><a href="#edge-cases">Edge case index</a></li>
+        </ol>
+      </div>
+
+      <h2 id="job">What verify is for</h2>
+      <div class="analogy">
+        <p>
+          Verify is a receptionist at a members-only door. A person walks up and says "I've paid".
+          The receptionist doesn't take their word for it. They <strong>call the bank</strong>, hear
+          the real answer, and only then stamp the membership card, <strong>once</strong>, even if the
+          same person (or a colleague) asks again a second later.
+        </p>
+      </div>
+      <p>Verify exists for the user's experience: they see "Payment successful" the moment they come back, instead of waiting for a webhook. It's one of the two ways back from <a href="03-the-big-picture.html#two-paths">Lesson 3</a>. The webhook is the other, and both must be safe to run together.</p>
+
+      <h2 id="return">The return handler</h2>
+      <p>Before verify, there's a tiny endpoint the gateway redirects the browser to. Its only job is to <strong>send the user to the right page</strong>:</p>
+      <ol>
+        <li>Read your order ID from the URL (or the posted form; accept both GET and POST).</li>
+        <li>Redirect to your app's payment-result page with that order ID.</li>
+        <li>If the order ID is missing, still redirect to a <strong>real page</strong> (e.g. the subscription page), never a 404.</li>
+      </ol>
+      <p>It does <strong>not</strong> decide anything about money. Anyone can open that URL. The page it redirects to then calls verify.</p>
+
+      <h2 id="steps">Verify, step by step</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Who is asking?</span>
+          <span class="step-body">The user comes from the login token, never from the request body.</span>
+        </li>
+        <li>
+          <span class="step-title">Is this order theirs?</span>
+          <span class="step-body">Look up the order by your order ID <em>and</em> this user. Not found → 404. Nobody can verify (or peek at) someone else's order.</span>
+        </li>
+        <li>
+          <span class="step-title">Already settled in our records?</span>
+          <span class="step-body">If it's already granted, answer "success" straight away. This makes repeated calls (refreshes, double calls) cheap and harmless.</span>
+        </li>
+        <li>
+          <span class="step-title">Ask the gateway</span>
+          <span class="step-body">Fetch the real status: Fetch Subscription for subscriptions, Get Order for one-time orders. It's a read, so retrying is safe and no idempotency key is needed.</span>
+        </li>
+        <li>
+          <span class="step-title">Check the answer makes sense</span>
+          <span class="step-body">A status is present, the ID matches, and for one-time orders the <strong>amount and currency match</strong> what you stored when you created it.</span>
+        </li>
+        <li>
+          <span class="step-title">Classify: success, pending, or failed</span>
+          <span class="step-body">Only final statuses lead to a decision (next section).</span>
+        </li>
+        <li>
+          <span class="step-title">Success → grant exactly once</span>
+          <span class="step-body">An atomic "only if not already granted" update or a lock. See <a href="#once">Granting exactly once</a>.</span>
+        </li>
+        <li>
+          <span class="step-title">Record the payments</span>
+          <span class="step-body">Add each gateway payment to your ledger, keyed by payment ID. If this fails, verify still succeeds.</span>
+        </li>
+        <li>
+          <span class="step-title">Failed (final) → mark this order only</span>
+          <span class="step-body">Never touch the user's access from other purchases.</span>
+        </li>
+        <li>
+          <span class="step-title">Pending → change nothing</span>
+          <span class="step-body">Reply "pending" so the frontend can check again.</span>
+        </li>
+        <li>
+          <span class="step-title">Reply with a clear state</span>
+          <span class="step-body"><code>success</code>, <code>pending</code> or <code>failed</code>, plus a friendly message.</span>
+        </li>
+      </ol>
+
+      <h2 id="final">Final vs not-final statuses</h2>
+      <p>The most important idea in this lesson:</p>
+      <p class="keyidea">Only decide on final answers. "Not finished yet" is not "failed".</p>
+      <p>
+        A subscription in <code>INITIALIZED</code> could mean the customer gave up, <em>or</em> that
+        they're approving the UPI AutoPay request on their phone right now. One check can't tell the
+        two apart, so you wait for something definite.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gateway says</th><th>Final?</th><th>Verify does</th></tr></thead>
+          <tbody>
+            <tr><td><code>ACTIVE</code> (subscription) / <code>PAID</code> (order)</td><td class="yes">Yes</td><td>Grant, exactly once</td></tr>
+            <tr><td><code>BANK_APPROVAL_PENDING</code></td><td class="yes">Customer's part is done</td><td>Grant now, or show "bank processing" (your policy)</td></tr>
+            <tr><td><code>INITIALIZED</code> / order <code>ACTIVE</code> (unpaid)</td><td class="no">No</td><td>Reply "pending", change nothing</td></tr>
+            <tr><td>Authorization <code>FAILED</code></td><td class="yes">Yes</td><td>Mark <strong>this order</strong> failed</td></tr>
+            <tr><td><code>LINK_EXPIRED</code> / order <code>EXPIRED</code></td><td class="yes">Yes</td><td>Mark <strong>this order</strong> abandoned</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Where do final answers come from, if not from verify? <strong>Webhooks</strong> (<a href="08-webhooks.html">Lesson 8</a>) and the <strong>session expiry</strong> deadline: after the checkout link expires, an unfinished subscription can never complete, so a cleanup job can safely mark it abandoned.</p>
+
+      <h2 id="pending">"Still in progress": what the user sees</h2>
+      <p>UPI and card approvals usually finish within seconds. So the frontend does a short, polite wait:</p>
+      <ol>
+        <li>Show "Confirming your payment…".</li>
+        <li>Call verify again every 3–5 seconds, for about a minute.</li>
+        <li><strong>Becomes success:</strong> "Payment successful 🎉", then refresh the user's plan.</li>
+        <li><strong>Still pending after a minute:</strong> "We haven't received confirmation yet. If you completed the payment, your plan will activate automatically in a few minutes." The webhook will finish the job.</li>
+        <li><strong>Final failure:</strong> "Payment wasn't completed. You haven't been charged for this attempt." Offer a retry button.</li>
+      </ol>
+      <div class="callout tip">
+        <span class="callout-title">Tip: eNACH needs different words</span>
+        <p>Bank mandates can take much longer than a minute. If the method was eNACH, say "Your bank is confirming the mandate. This can take a while; we'll update your plan automatically."</p>
+      </div>
+
+      <h2 id="once">Granting exactly once</h2>
+      <p>
+        The return and the webhook often arrive within the same second. If both read "not granted
+        yet" and then both grant, the user gets two months, or two coupons. Reading first and writing
+        second is the bug; the fix is to make <strong>check-and-write a single step</strong>.
+      </p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 250" role="img" aria-label="Verify and webhook both try a conditional update; only one changes the row">
+            <defs>
+              <marker id="ah7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <rect x="20" y="40" width="160" height="46" rx="8" class="d-box"/>
+            <text x="100" y="60" text-anchor="middle" class="d-text">Verify</text>
+            <text x="100" y="77" text-anchor="middle" class="d-muted">user came back</text>
+
+            <rect x="20" y="164" width="160" height="46" rx="8" class="d-box"/>
+            <text x="100" y="184" text-anchor="middle" class="d-text">Webhook</text>
+            <text x="100" y="201" text-anchor="middle" class="d-muted">gateway calls you</text>
+
+            <rect x="270" y="70" width="230" height="110" rx="10" class="d-box accent"/>
+            <text x="385" y="94" text-anchor="middle" class="d-text">One database statement</text>
+            <text x="290" y="120" class="d-small d-mono">UPDATE order SET granted</text>
+            <text x="290" y="140" class="d-small d-mono">WHERE id = 'sub_42'</text>
+            <text x="290" y="160" class="d-small d-mono">  AND not yet granted</text>
+
+            <line x1="180" y1="63" x2="268" y2="100" class="d-line" marker-end="url(#ah7)"/>
+            <text x="200" y="68" class="d-muted">first</text>
+            <line x1="180" y1="187" x2="268" y2="152" class="d-line" marker-end="url(#ah7)"/>
+            <text x="196" y="200" class="d-muted">a moment later</text>
+
+            <rect x="580" y="40" width="170" height="46" rx="8" class="d-box ok"/>
+            <text x="665" y="60" text-anchor="middle" class="d-text">1 row changed</text>
+            <text x="665" y="77" text-anchor="middle" class="d-muted">→ you won: grant access</text>
+
+            <rect x="580" y="164" width="170" height="46" rx="8" class="d-box"/>
+            <text x="665" y="184" text-anchor="middle" class="d-text">0 rows changed</text>
+            <text x="665" y="201" text-anchor="middle" class="d-muted">→ already done: just say OK</text>
+
+            <line x1="500" y1="100" x2="578" y2="66" class="d-line" marker-end="url(#ah7)"/>
+            <line x1="500" y1="152" x2="578" y2="186" class="d-line" marker-end="url(#ah7)"/>
+          </svg>
+        </div>
+        <figcaption>The database lets only one request flip "not granted" to "granted". The other sees 0 rows changed and does nothing.</figcaption>
+      </figure>
+
+      <h3>Three tools for "exactly once"</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tool</th><th>Use it when</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Conditional update</strong></td><td>Granting is one row change</td><td>Add "and not already granted" to the <code>WHERE</code>. Act only if 1 row changed.</td></tr>
+            <tr><td><strong>Lock</strong></td><td>Granting is several steps (order row, user row, emails)</td><td>Lock on the order ID (DB named lock, or <code>SELECT … FOR UPDATE</code> in a transaction), check, do all steps, unlock.</td></tr>
+            <tr><td><strong>Unique key</strong></td><td>Each grant matches one <em>thing</em> (a payment, a coupon)</td><td>Insert the payment ID or order ID into a UNIQUE column. A duplicate insert means "already done".</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Both callers can tell their own caller "success". Only one of them actually changes anything.</p>
+
+      <div class="callout warn">
+        <span class="callout-title">Watch out: "add a month" vs "set until"</span>
+        <p>
+          <code>expiry = expiry + 1 month</code> is dangerous: running it twice gives two months.
+          <code>expiry = start of period + 1 month</code> is <em>naturally</em> safe to repeat. When you
+          can, write updates that give the same result however many times they run.
+        </p>
+      </div>
+
+      <h2 id="ledger">Recording the payments</h2>
+      <p>After a successful grant, ask the gateway for the list of payments (e.g. "fetch all payments of this subscription") and store each one:</p>
+      <ul>
+        <li><strong>Keyed by the gateway's payment ID</strong> (UNIQUE). Seeing the same payment again just updates its status; no duplicate rows.</li>
+        <li>Store amount, status, method (UPI / card / eNACH), AUTH or CHARGE, failure reason, and which order or subscription it belongs to.</li>
+        <li><strong>Best effort.</strong> If this extra call fails, verify still succeeds. The webhook or a later sync fills the gap. The customer should never see an error because a receipt couldn't be fetched.</li>
+      </ul>
+
+      <h2 id="never">Things verify must never do</h2>
+      <div class="callout edge">
+        <span class="callout-title">Never</span>
+        <ul>
+          <li><strong>Grant because the URL says so.</strong> Only the gateway's answer counts.</li>
+          <li><strong>Treat "not finished" as "failed".</strong> The user may be mid-approval.</li>
+          <li><strong>Downgrade the user because one order failed.</strong> A failed or abandoned new attempt says nothing about access they already paid for. Mark the <em>order</em>, not the person.</li>
+          <li><strong>Extend access twice</strong> for the same payment, from verify, webhook, refresh or retry.</li>
+          <li><strong>Pass the gateway's error codes</strong> through to the user (see <a href="04-talking-to-the-gateway-api.html#dont-pass-through">Lesson 4</a>).</li>
+        </ul>
+      </div>
+
+      <h2 id="responses">What verify returns</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>State</th><th>HTTP</th><th>User sees</th><th>Frontend then</th></tr></thead>
+          <tbody>
+            <tr><td><code>success</code></td><td>200</td><td>"Payment successful"</td><td>Refresh the user's plan</td></tr>
+            <tr><td><code>pending</code></td><td>200 (or 202)</td><td>"Confirming your payment…"</td><td>Check again in a few seconds</td></tr>
+            <tr><td><code>failed</code></td><td>200</td><td>"Payment wasn't completed"</td><td>Offer to try again</td></tr>
+            <tr><td>Not your order</td><td>404</td><td>"Order not found"</td><td>Stop</td></tr>
+            <tr><td>Gateway unreachable</td><td>502</td><td>"Couldn't confirm right now"</td><td>Retry shortly; the webhook covers it anyway</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <span class="callout-title">Why "failed" can still be HTTP 200</span>
+        <p>The request worked: you successfully found out the payment failed. Keeping HTTP errors for "the request itself broke" makes the frontend simpler. Choose one convention and use it everywhere.</p>
+      </div>
+
+      <h2 id="frontend">The frontend side</h2>
+      <ul>
+        <li><strong>Read the order ID once, then remove it from the URL</strong> using your router's navigate/replace, not <code>window.history</code> directly. Otherwise the router still "sees" the old URL, and moving between tabs or refreshing triggers verify again.</li>
+        <li><strong>Don't run verify twice in parallel</strong> (e.g. on mount <em>and</em> on a re-render). Guard it with a flag.</li>
+        <li><strong>Refresh the user's data</strong> after success so the new plan shows everywhere.</li>
+        <li><strong>Mobile apps:</strong> make sure the return actually lands back inside the app (deep link or native SDK). See <a href="03-the-big-picture.html#mobile">Lesson 3</a>.</li>
+      </ul>
+
+      <h2 id="edge-cases">Edge case index</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Edge case</th><th>Handled by</th></tr></thead>
+          <tbody>
+            <tr><td>Fake <code>?payment=success</code> in the URL</td><td>Only the gateway's status counts</td></tr>
+            <tr><td>Verifying someone else's order</td><td>Look up by order ID <em>and</em> user</td></tr>
+            <tr><td>User returns before approving in their UPI app</td><td>Pending, not failed; frontend re-checks</td></tr>
+            <tr><td>Return and webhook at the same moment</td><td>Conditional update / lock</td></tr>
+            <tr><td>User refreshes the result page</td><td>"Already granted" fast path; URL cleaned</td></tr>
+            <tr><td>Abandoned new attempt by an existing subscriber</td><td>Mark the order, never downgrade the person</td></tr>
+            <tr><td>Paid amount differs from what you expected</td><td>Check amount and currency before granting</td></tr>
+            <tr><td>Gateway down during verify</td><td>502 "try shortly"; webhook completes it</td></tr>
+            <tr><td>Receipt / payments fetch fails</td><td>Best effort; verify still succeeds</td></tr>
+            <tr><td>User closes the tab and never returns</td><td>Webhook grants anyway</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="06-creating-an-order.html"><small>← Previous</small><span>Creating an order, safely</span></a>
+        <a class="next" href="08-webhooks.html"><small>Next →</small><span>Webhooks</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

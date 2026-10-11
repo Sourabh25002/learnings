@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talking to the Gateway API</title>
+  <meta name="description" content="Lesson 4: keys and headers, status codes, timeouts, retries, rate limits and a shared gateway client.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Payment Gateway Integration</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Payment Gateway Integration</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-a-payment-gateway.html">What is a payment gateway?</a></li>
+        <li><a href="02-one-time-vs-recurring.html">One-time vs recurring payments</a></li>
+        <li><a href="03-the-big-picture.html">The end-to-end flow</a></li>
+        <li><a href="04-talking-to-the-gateway-api.html" aria-current="page">Talking to the gateway API</a></li>
+        <li><a href="05-idempotency.html">Idempotency</a></li>
+        <li><a href="06-creating-an-order.html">Creating an order, safely</a></li>
+        <li><a href="07-verifying-a-payment.html">Verifying a payment</a></li>
+        <li><a href="08-webhooks.html">Webhooks</a></li>
+        <li><a href="09-renewals-and-cancellations.html">Renewals, failures and cancellations</a></li>
+        <li><a href="10-one-time-payments.html">One-time payments: add-ons and coupons</a></li>
+        <li><a href="11-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 4</p>
+      <h1>Talking to the gateway API</h1>
+      <p class="lead">
+        Every interaction with the gateway is an HTTP request from your server. Getting the
+        basics right (keys, headers, errors, timeouts, retries) prevents most production incidents.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#headers">The headers on every request</a></li>
+          <li><a href="#keys">Keeping keys safe</a></li>
+          <li><a href="#versions">API versions</a></li>
+          <li><a href="#status-codes">HTTP status codes and what to do</a></li>
+          <li><a href="#timeouts">Timeouts: the "unknown" outcome</a></li>
+          <li><a href="#retries">When to retry</a></li>
+          <li><a href="#dont-pass-through">Don't pass the gateway's errors to your users</a></li>
+          <li><a href="#rate-limits">Rate limits</a></li>
+          <li><a href="#client">One shared gateway client</a></li>
+          <li><a href="#logging">Logging</a></li>
+        </ol>
+      </div>
+
+      <h2 id="headers">The headers on every request</h2>
+      <p>
+        Headers are labels on the outside of an HTTP request, separate from the JSON body. Two say
+        <em>who you are</em>; the others control <em>how the request is handled</em>.
+      </p>
+      <pre><code>x-client-id:       your app ID          ← like a username
+x-client-secret:   your secret key      ← like a password
+x-api-version:     2026-01-01           ← which version of the API
+x-request-id:      9f2c…  (optional)    ← your tracking ID for this call
+x-idempotency-key: 47bf…  (optional)    ← "this is a retry of the same request"
+Content-Type:      application/json</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Header</th><th>Required?</th><th>Why it exists</th></tr></thead>
+          <tbody>
+            <tr><td><code>x-client-id</code></td><td class="yes">Yes</td><td>Identifies your merchant account. Found in the gateway dashboard.</td></tr>
+            <tr><td><code>x-client-secret</code></td><td class="yes">Yes</td><td>Proves it's really you. Anyone with this can act as your business.</td></tr>
+            <tr><td><code>x-api-version</code></td><td class="yes">Yes</td><td>Fixes the request and response format, so the gateway's changes don't break you.</td></tr>
+            <tr><td><code>x-request-id</code></td><td>No</td><td>An ID <em>you</em> choose. Log it; give it to gateway support so they can find the exact call.</td></tr>
+            <tr><td><code>x-idempotency-key</code></td><td>No</td><td>Makes retries safe. It gets its own lesson (<a href="05-idempotency.html">Lesson 5</a>).</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="keys">Keeping keys safe</h2>
+      <ul>
+        <li><strong>Server only.</strong> The secret must never be in frontend code, a mobile app bundle, or anything a user can download.</li>
+        <li><strong>Environment variables or a secrets manager</strong>, never committed to git.</li>
+        <li><strong>Different keys per environment.</strong> Sandbox keys only work with the sandbox URL; live keys only with production.</li>
+        <li><strong>Never log them</strong>, even in error logs. Mask headers in any request logging.</li>
+        <li><strong>Rotate</strong> them if they ever leak or someone with access leaves.</li>
+        <li><strong>The same secret often signs webhooks.</strong> If it leaks, attackers can also forge "payment successful" messages to you.</li>
+      </ul>
+
+      <h2 id="versions">API versions</h2>
+      <p>
+        Gateways change field names and response shapes over time. The version header lets you
+        <strong>pin</strong> the format you built against. Upgrade on purpose, test in sandbox, then
+        switch.
+      </p>
+      <div class="callout warn">
+        <span class="callout-title">Read field names exactly</span>
+        <p>
+          Small differences matter. For example, Cashfree's request uses
+          <code>authorization_details</code> (with a <strong>z</strong>), while the response uses
+          <code>authorisation_details</code> (with an <strong>s</strong>). Read the wrong one and you
+          silently get <code>undefined</code>. Copy names from the docs for the exact version you pin.
+        </p>
+      </div>
+
+      <h2 id="status-codes">HTTP status codes and what to do</h2>
+      <p>Each response comes with a status code. Each code calls for a different reaction:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Code</th><th>Means</th><th>Typical cause</th><th>Retry?</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><strong>200</strong></td><td>Success</td><td>Normal</td><td>—</td><td>Validate the body, then continue.</td></tr>
+            <tr><td><strong>400</strong></td><td>Bad request</td><td>Invalid phone or email, duplicate ID, wrong field</td><td class="no">No</td><td>Fix the input. Show the user a clear message.</td></tr>
+            <tr><td><strong>401</strong></td><td>Authentication failed</td><td>Wrong keys, or sandbox keys used against production</td><td class="no">No</td><td><strong>Alert yourself</strong>: config is broken for everyone.</td></tr>
+            <tr><td><strong>404</strong></td><td>Not found</td><td>Unknown plan or subscription ID</td><td class="no">No</td><td>Usually a setup error; alert.</td></tr>
+            <tr><td><strong>422</strong></td><td>Idempotency conflict</td><td>Same idempotency key, different body</td><td class="no">No</td><td>Bug in your code; fix the key handling.</td></tr>
+            <tr><td><strong>429</strong></td><td>Too many requests</td><td>Rate limit hit</td><td class="maybe">Later</td><td>Back off and retry after a delay.</td></tr>
+            <tr><td><strong>5xx</strong></td><td>Gateway's server error</td><td>Their outage</td><td class="maybe">Yes, carefully</td><td>Retry with backoff and the same idempotency key.</td></tr>
+            <tr><td><strong>No response</strong></td><td>Timeout or network drop</td><td>Slow network, connection reset</td><td class="maybe">Yes, carefully</td><td>The outcome is <em>unknown</em>. See below.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Simple rule: <strong>4xx = your problem</strong> (don't retry; fix it).
+        <strong>5xx, 429 or no response = maybe temporary</strong> (retry safely).
+      </p>
+
+      <h2 id="timeouts">Timeouts: the "unknown" outcome</h2>
+      <p>Always set a timeout (for example 10–15 seconds). Without one, a hung connection can block a request forever.</p>
+      <p>But understand what a timeout means:</p>
+      <p class="keyidea">
+        A timeout doesn't mean the request failed. It means you don't know whether it succeeded.
+      </p>
+      <p>
+        The gateway may have created the subscription and the response got lost on the way back.
+        You have three options:
+      </p>
+      <ol>
+        <li><strong>Retry with the same idempotency key.</strong> If it was created, the gateway returns the original result. (<a href="05-idempotency.html">Lesson 5</a>)</li>
+        <li><strong>Fetch by your own ID.</strong> Ask "do you have subscription X?" before creating again.</li>
+        <li><strong>Give up and use a new ID.</strong> The old one, if it exists, is never paid and expires on its own. That's safe for <em>creating</em>; it's <strong>not</strong> safe for actions that move money.</li>
+      </ol>
+
+      <h2 id="retries">When to retry</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Situation</th><th>Retry?</th><th>How</th></tr></thead>
+          <tbody>
+            <tr><td>Timeout or connection reset</td><td class="yes">Yes</td><td>Same idempotency key, short delay</td></tr>
+            <tr><td>5xx from the gateway</td><td class="yes">Yes</td><td>Same key, exponential backoff (e.g. 0.5s, 1s, 2s)</td></tr>
+            <tr><td>429 rate limit</td><td class="maybe">Later</td><td>Wait (check any retry-after header); don't hammer</td></tr>
+            <tr><td>400 / 401 / 404 / 422</td><td class="no">No</td><td>Retrying gives the same answer</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><strong>Keep it small:</strong> 1–3 attempts. The user is waiting.</li>
+        <li><strong>Add jitter</strong> (a small random extra delay) so thousands of clients don't all retry at the same instant after an outage.</li>
+        <li><strong>Never retry money-moving calls</strong> (charges, refunds) without an idempotency key.</li>
+      </ul>
+
+      <h2 id="dont-pass-through">Don't pass the gateway's errors to your users</h2>
+      <p>
+        It's tempting to return whatever the gateway returned. Don't. A gateway <strong>401</strong>
+        means <em>your server's</em> keys are wrong, but if you send 401 to your frontend, it thinks
+        <em>the user's</em> login expired. It may log them out, or refresh the token and repeat the
+        request (creating another subscription).
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gateway said</th><th>You return to your app</th><th>User sees</th></tr></thead>
+          <tbody>
+            <tr><td>400 because of user input</td><td>400 with a clear message</td><td>"Please add a valid 10-digit mobile number."</td></tr>
+            <tr><td>401, 404, 422 (your setup)</td><td><strong>502</strong></td><td>"Payment provider issue, please try again."</td></tr>
+            <tr><td>429</td><td><strong>503</strong></td><td>"Busy, try again in a minute."</td></tr>
+            <tr><td>5xx or timeout</td><td><strong>502</strong></td><td>"Payment provider issue, please try again."</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Keep the gateway's full error body in your <strong>logs</strong>, not in the response. Never send database or internal error messages to the client either.</p>
+
+      <h2 id="rate-limits">Rate limits</h2>
+      <p>
+        Gateways limit how many requests you can make per second or minute, usually for
+        <strong>your whole merchant account</strong>, not per customer.
+      </p>
+      <div class="callout edge">
+        <span class="callout-title">Edge case: one user can block everyone</span>
+        <p>
+          If a single user (or a bot) hits your "create subscription" endpoint in a loop, they use up
+          your account's limit. Then <em>every</em> customer gets 429 errors. Protect yourself with a
+          per-user limit (e.g. 5 creates per 10 minutes), and reuse a recent pending subscription
+          instead of creating a new one (<a href="06-creating-an-order.html">Lesson 6</a>).
+        </p>
+      </div>
+
+      <h2 id="client">One shared gateway client</h2>
+      <p>
+        A common mess: every function builds its own URL, headers, timeout and error handling, all
+        copy-pasted. Then one gets a different timeout, another forgets the version header, and error
+        handling differs everywhere.
+      </p>
+      <p>Instead, put all gateway communication in <strong>one module</strong>:</p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 240" role="img" aria-label="Many functions call one shared gateway client which calls the gateway API">
+            <defs>
+              <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <rect x="10" y="24" width="200" height="36" rx="8" class="d-box"/>
+            <text x="110" y="47" text-anchor="middle" class="d-small d-mono">createSubscription()</text>
+            <rect x="10" y="74" width="200" height="36" rx="8" class="d-box"/>
+            <text x="110" y="97" text-anchor="middle" class="d-small d-mono">fetchSubscription()</text>
+            <rect x="10" y="124" width="200" height="36" rx="8" class="d-box"/>
+            <text x="110" y="147" text-anchor="middle" class="d-small d-mono">cancelSubscription()</text>
+            <rect x="10" y="174" width="200" height="36" rx="8" class="d-box"/>
+            <text x="110" y="197" text-anchor="middle" class="d-small d-mono">createOrder()</text>
+
+            <line x1="210" y1="42" x2="283" y2="100" class="d-line" marker-end="url(#ah4)"/>
+            <line x1="210" y1="92" x2="283" y2="114" class="d-line" marker-end="url(#ah4)"/>
+            <line x1="210" y1="142" x2="283" y2="128" class="d-line" marker-end="url(#ah4)"/>
+            <line x1="210" y1="192" x2="283" y2="142" class="d-line" marker-end="url(#ah4)"/>
+
+            <rect x="285" y="20" width="230" height="200" rx="10" class="d-box accent"/>
+            <text x="400" y="46" text-anchor="middle" class="d-text">Gateway client</text>
+            <text x="305" y="74" class="d-small">• base URL + keys from config</text>
+            <text x="305" y="96" class="d-small">• API version header</text>
+            <text x="305" y="118" class="d-small">• timeout on every call</text>
+            <text x="305" y="140" class="d-small">• reused (keep-alive) connections</text>
+            <text x="305" y="162" class="d-small">• safe retries only</text>
+            <text x="305" y="184" class="d-small">• one error mapper</text>
+            <text x="305" y="206" class="d-small">• request ID + logging</text>
+
+            <line x1="515" y1="120" x2="588" y2="120" class="d-line" marker-end="url(#ah4)"/>
+
+            <rect x="590" y="88" width="160" height="64" rx="10" class="d-box"/>
+            <text x="670" y="114" text-anchor="middle" class="d-text">Gateway API</text>
+            <text x="670" y="134" text-anchor="middle" class="d-muted">sandbox or production</text>
+          </svg>
+        </div>
+        <figcaption>Business code calls simple functions. One client handles every detail of talking to the gateway.</figcaption>
+      </figure>
+
+      <h3>Why "keep-alive" matters</h3>
+      <p>
+        Every new HTTPS connection costs a handshake: several round trips before any data moves, often
+        100 ms or more. By default some HTTP libraries open a fresh connection per request. A
+        keep-alive agent <strong>reuses open connections</strong>, so later calls skip the handshake.
+        At high volume this saves real latency and server resources.
+      </p>
+
+      <h2 id="logging">Logging</h2>
+      <p>For each gateway call, one structured log line is worth more than ten scattered <code>console.log</code>s:</p>
+      <ul>
+        <li><strong>Log:</strong> your order ID, the gateway's ID, your request ID, the endpoint, status code, how long it took, and the user ID.</li>
+        <li><strong>Mask:</strong> phone numbers, emails and names (personal data).</li>
+        <li><strong>Never log:</strong> secret keys, full card numbers, auth headers.</li>
+      </ul>
+      <div class="callout tip">
+        <span class="callout-title">Tip: alert on configuration errors</span>
+        <p>
+          A burst of 401 or 404 responses means something is misconfigured (keys, plan IDs,
+          environment) and <em>every</em> payment is failing. These should page someone, not sit
+          quietly in a log file.
+        </p>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="03-the-big-picture.html"><small>← Previous</small><span>The end-to-end flow</span></a>
+        <a class="next" href="05-idempotency.html"><small>Next →</small><span>Idempotency</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>
