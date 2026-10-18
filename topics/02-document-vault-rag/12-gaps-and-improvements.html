@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Known gaps and improvements</title>
+  <meta name="description" content="Every gap found in the Doc Vault so far, grouped by severity, with fixes and good first tickets.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html" aria-current="page">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 12</p>
+      <h1>Known gaps and improvements</h1>
+
+      <p class="lead">
+        Every gap found while studying the Vault, in one place, with how serious it is and how
+        to fix it. These are good first tickets: small, real fixes that are easy to explain.
+        Chat-side gaps will be added after Lessons 9–11.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#security">Security</a></li>
+          <li><a href="#correctness">Correctness</a></li>
+          <li><a href="#reliability">Reliability</a></li>
+          <li><a href="#waste">Wasted work and cleanup</a></li>
+          <li><a href="#tickets">Good first tickets</a></li>
+        </ol>
+      </div>
+
+      <div class="callout">
+        <span class="callout-title">Before changing anything</span>
+        <p>
+          Show the list to the team lead first. Some of these depend on decisions that aren't
+          visible in the code (for example, how the <code>vaultFiles</code> table's unique key is
+          defined, or whether the Vault was ever meant to support PMS-specific extraction).
+        </p>
+      </div>
+
+      <h2 id="security">Security</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gap</th><th>Where</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Upload into someone else's account.</strong> Uses the <code>userId</code> sent by the frontend, not the one from the login token.</td><td><code>vaultRoutes.py</code> <code>/upload</code></td><td>Use <code>g.userId</code></td></tr>
+            <tr><td><strong>No server-side file checks.</strong> PDF-only, size and page limits are frontend-only.</td><td><code>/upload</code></td><td>Check type, size and pages in the route; set Flask's <code>MAX_CONTENT_LENGTH</code></td></tr>
+            <tr><td><strong>Hard-coded fallback internal key.</strong> Missing <code>INTERNAL_API_KEY</code> falls back to a key in the source code.</td><td><code>core/config.py</code></td><td>Refuse to start without the key</td></tr>
+            <tr><td><strong>Unlocked PDF copies left on disk.</strong></td><td><code>extractPdfPageWise</code></td><td>Delete the temp copy in a <code>finally</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="correctness">Correctness</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gap</th><th>Where</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Scanned PDFs marked "completed".</strong> The <code>--- Page N ---</code> label means empty pages never look empty.</td><td><code>processFile</code> + <code>extractPdfPageWise</code></td><td>Check the text without the label; mark scanned files as an error with a clear message (or fall back to OCR)</td></tr>
+            <tr><td><strong>Wrong page numbers</strong> after an "Annexure A" page is skipped.</td><td><code>processFile</code></td><td>Return real page numbers from extraction</td></tr>
+            <tr><td><strong>0 chunks still "completed".</strong></td><td><code>processFile</code></td><td>Treat 0 chunks as an error</td></tr>
+            <tr><td><strong>Fallback embedding model has a different size</strong> (384 vs 768).</td><td><code>getEmbeddingModel</code></td><td>Remove the fallback, or store which model indexed each document</td></tr>
+            <tr><td><strong>Password-protected PDFs always fail</strong>; <code>holdingType</code> never used.</td><td>pending-files query</td><td>Select the columns, or remove the dead branches</td></tr>
+            <tr><td><strong>"Annexure A" pages always skipped</strong>, a rule copied from the loan form.</td><td><code>extractPdfPageWise</code></td><td>Make the skip optional; off for the Vault</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="reliability">Reliability</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gap</th><th>Where</th><th>Fix</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Half-finished multi-file uploads</strong>; quota not counted for files that did upload.</td><td><code>/upload</code></td><td>Count usage per file; report which files succeeded</td></tr>
+            <tr><td><strong>Re-upload with the same name orphans</strong> the old PDF and index in S3.</td><td><code>addVaultFile</code></td><td>Delete the old S3 objects when a row is overwritten</td></tr>
+            <tr><td><strong>S3 succeeds, DB fails</strong> → orphan PDF.</td><td><code>/upload</code></td><td>Delete the S3 object if the insert fails</td></tr>
+            <tr><td><strong>Same-millisecond S3 names</strong> overwrite each other.</td><td><code>/upload</code></td><td>Add a UUID to the name</td></tr>
+            <tr><td><strong>Failed status updates ignored</strong> → files re-processed.</td><td><code>processFile</code></td><td>Retry the update, or log loudly</td></tr>
+            <tr><td><strong>"No pending files" hides connection errors.</strong></td><td><code>apiGetPending</code></td><td>Return <code>None</code> on error and log it differently</td></tr>
+            <tr><td><strong>Concurrent uploads can beat the quota.</strong></td><td><code>fileQuota.py</code></td><td>Atomic check-and-increment in one SQL statement</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="waste">Wasted work and cleanup</h2>
+      <ul>
+        <li>Camelot scans every page twice; the Vault throws the tables away. Skip it on the Vault path. This is the biggest speed win.</li>
+        <li>Each page's text is extracted twice.</li>
+        <li>Local ChromaDB folders are never deleted after upload.</li>
+        <li><code>userName</code> required but unused (left behind by my quota change).</li>
+        <li>Old pipeline files: <code>rag/chunker.py</code>, <code>embedder.py</code>, <code>vectorStore.py</code>, <code>retriever.py</code>, <code>textractOcr.py</code>.</li>
+        <li>Outdated docstrings (Textract, non-existent command-line options); the misleading <code>processBatch</code> default of 5.</li>
+        <li><code>indexS3Key</code> built by hand in the worker instead of returned by <code>indexDocument</code>.</li>
+      </ul>
+
+      <h2 id="tickets">Good first tickets</h2>
+      <p>Small, safe and easy to explain in an interview:</p>
+      <ul class="checklist">
+        <li>Bind <code>/upload</code> to <code>g.userId</code> (security)</li>
+        <li>Server-side file validation on <code>/upload</code> (security)</li>
+        <li>Fix the scanned-PDF "completed" bug (correctness, visible to users)</li>
+        <li>Remove the <code>userName</code> check (follow-up to my quota work)</li>
+        <li>Skip Camelot on the Vault path (speed)</li>
+        <li>UUID in S3 names (reliability)</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="11-deleting-and-cleanup.html"><small>← Previous</small><span>Deleting files and cleanup</span></a>
+        <a class="next" href="13-interview-questions.html"><small>Next →</small><span>Interview questions &amp; answers</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

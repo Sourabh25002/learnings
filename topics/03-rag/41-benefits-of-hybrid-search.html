@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benefits of Hybrid Search</title>
+  <meta name="description" content="Why combine dense and sparse retrieval: better recall, synonyms and rephrasing, robustness, rare-term importance, mixed documents, tunable weights, typo tolerance, and the use cases where hybrid search pays off.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html" aria-current="page">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 7 · Lesson 41</p>
+      <h1>Benefits of Hybrid Search</h1>
+
+      <p class="lead">Why run two searches? Because each covers the other's blind spots.</p>
+
+      <div class="split">
+        <div>
+          <h4>Sparse (BM25) is strong at</h4>
+          <ul>
+            <li>Exact terms, names, codes</li>
+            <li><strong>Rare keywords</strong>: BM25 weighs them heavily (crucial in technical, legal and medical text, e.g. "osteoporosis")</li>
+            <li>Users who search by specific terms ("LangChain agents")</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Dense (embeddings) is strong at</h4>
+          <ul>
+            <li>Synonyms and rephrasing ("create app" ↔ "build system")</li>
+            <li>Descriptive questions ("How do I use LangChain to talk to tools?") and loosely written text</li>
+            <li>Typos and spelling variants</li>
+          </ul>
+        </div>
+      </div>
+      <p>
+        Together they <strong>boost <a href="background-concepts.html#recall" title="Background concepts">recall</a></strong> (fewer relevant documents
+        missed), cope with mixed collections of well-structured and messy documents, and are
+        easy to tune with the weights.
+      </p>
+
+      <h2 id="use-cases">Where it pays off</h2>
+      <ul>
+        <li><strong>Avoiding "retrieval hallucination"</strong>: retrieving chunks that don't really answer the question. Requiring keyword and meaning matches guards against it.</li>
+        <li><strong>Technical docs</strong>: "how to use the API" vs docs titled "API usage".</li>
+        <li><strong>Legal and medical Q&amp;A</strong>: precise terms <em>and</em> varied wording.</li>
+        <li><strong>Product search</strong>: "cheap noise cancelling headphones" ↔ "affordable ANC earbuds": dense connects the meaning, BM25 confirms "ANC".</li>
+        <li><strong>Multilingual retrieval and support transcripts.</strong></li>
+      </ul>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>Keywords vs meaning</strong>: hybrid search gets both.</li>
+        <li><strong>Best fits</strong>: technical, legal, medical and product search.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="40-hybrid-retriever-in-langchain.html"><small>← Previous</small><span>Hybrid retriever in LangChain</span></a>
+        <a class="next" href="42-reranking.html"><small>Next →</small><span>Reranking</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

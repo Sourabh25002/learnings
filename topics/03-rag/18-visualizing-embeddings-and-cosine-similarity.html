@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visualizing Embeddings</title>
+  <meta name="description" content="Plotting word vectors in 2D to see similar words cluster, why real embeddings have hundreds of dimensions, and writing a cosine similarity function with NumPy.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html" aria-current="page">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 4 · Lesson 18</p>
+      <h1>Visualizing Embeddings and Cosine Similarity</h1>
+
+      <p class="lead">
+        The previous lesson in code: plot a few word vectors to <em>see</em> that similar words
+        cluster, then compute cosine similarity to <em>measure</em> it, with
+        <a href="background-concepts.html#numpy" title="Background concepts">NumPy and Matplotlib</a>.
+      </p>
+
+      <h2 id="dimensions">Dimensions</h2>
+      <p>
+        Each number in a vector is a <strong>dimension</strong>. Real embedding models produce many,
+        and the count depends on the model:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Model (example)</th><th>Dimensions</th></tr></thead>
+          <tbody>
+            <tr><td>An OpenAI embedding model</td><td>around 1,500</td></tr>
+            <tr><td>A Hugging Face embedding model</td><td>384</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The dimensions <strong>have no names</strong>: unlike the "action/comedy" example, nobody knows what each number stands for.</p>
+
+      <h2 id="plot">Similar words cluster</h2>
+      <p>Made-up 2-dimensional vectors, so they can be plotted:</p>
+      <pre><code>import numpy as np
+import matplotlib.pyplot as plt
+
+word_embeddings = {
+    "cat":    [0.8, 0.6],
+    "kitten": [0.75, 0.65],
+    "dog":    [0.7, 0.3],
+    "puppy":  [0.65, 0.35],
+    # "car" and "truck": values far from the animals
+}
+
+fig, ax = plt.subplots(figsize=(8, 6))
+for word, coords in word_embeddings.items():
+    ax.scatter(coords[0], coords[1], s=100)      # first number on x, second on y
+    ax.annotate(word, (coords[0], coords[1]))     # label the point with its word
+plt.show()</code></pre>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 680 360" role="img" aria-label="Word vectors in 2D: cat and kitten close together, dog and puppy close together below them, car and truck together far away in the bottom left.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <!-- axes: 300px per unit, origin (60,330) -->
+            <line x1="60" y1="330" x2="390" y2="330" class="d-line" marker-end="url(#ah1)"/>
+            <line x1="60" y1="330" x2="60" y2="14" class="d-line" marker-end="url(#ah1)"/>
+            <text x="50" y="344" text-anchor="end" class="d-muted d-mono">0</text>
+            <line x1="210" y1="326" x2="210" y2="334" class="d-line"/>
+            <text x="210" y="348" text-anchor="middle" class="d-muted d-mono">0.5</text>
+            <line x1="360" y1="326" x2="360" y2="334" class="d-line"/>
+            <text x="360" y="348" text-anchor="middle" class="d-muted d-mono">1</text>
+            <line x1="56" y1="180" x2="64" y2="180" class="d-line"/>
+            <text x="50" y="184" text-anchor="end" class="d-muted d-mono">0.5</text>
+            <line x1="56" y1="30" x2="64" y2="30" class="d-line"/>
+            <text x="50" y="34" text-anchor="end" class="d-muted d-mono">1</text>
+
+            <circle cx="300" cy="150" r="6" class="d-box accent"/>
+            <text x="310" y="155" class="d-small d-mono">cat</text>
+            <circle cx="285" cy="135" r="6" class="d-box accent"/>
+            <text x="275" y="131" text-anchor="end" class="d-small d-mono">kitten</text>
+
+            <circle cx="270" cy="240" r="6" class="d-box ok"/>
+            <text x="280" y="245" class="d-small d-mono">dog</text>
+            <circle cx="255" cy="225" r="6" class="d-box ok"/>
+            <text x="245" y="221" text-anchor="end" class="d-small d-mono">puppy</text>
+
+            <circle cx="105" cy="270" r="6" class="d-box"/>
+            <text x="115" y="266" class="d-small d-mono">car</text>
+            <circle cx="120" cy="285" r="6" class="d-box"/>
+            <text x="130" y="296" class="d-small d-mono">truck</text>
+
+            <text x="430" y="130" class="d-text d-label-accent">cat ≈ kitten</text>
+            <text x="430" y="200" class="d-text d-label-ok">dog ≈ puppy</text>
+            <text x="430" y="270" class="d-text">car ≈ truck</text>
+            <text x="430" y="290" class="d-muted">far from the animals</text>
+          </svg>
+        </div>
+        <figcaption>Similar words form clusters. (Car and truck are placed roughly; their exact values weren't read out.)</figcaption>
+      </figure>
+      <p>Three clusters: cat and kitten, dog and puppy, and car and truck far from the animals.</p>
+
+      <h2 id="cosine">Cosine similarity in code</h2>
+      <pre><code>cosine similarity = (A · B) / (‖A‖ × ‖B‖)</code></pre>
+      <p>The formula from <a href="17-introduction-to-embeddings-and-vector-databases.html#cosine">Lesson 17</a>, with a NumPy function for each part:</p>
+      <pre><code>def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)    # A · B
+    norm_a = np.linalg.norm(vec1)       # ‖A‖, magnitude of A
+    norm_b = np.linalg.norm(vec2)       # ‖B‖, magnitude of B
+    return dot_product / (norm_a * norm_b)</code></pre>
+      <p>A <strong>dot product</strong> multiplies the two vectors number by number and adds the results into one number; <strong>norm</strong> is a vector's length.</p>
+
+      <h2 id="results">Reading the result</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Close to</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><strong>1</strong></td><td>Very similar</td></tr>
+            <tr><td><strong>0</strong></td><td>Not related</td></tr>
+            <tr><td><strong>−1</strong></td><td>Opposite</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre><code>cat_kitten_similarity = cosine_similarity(cat_vector, kitten_vector)
+print(cat_kitten_similarity)   # 0.996
+
+cat_car_similarity = cosine_similarity(cat_vector, car_vector)
+print(cat_car_similarity)      # -0.4367</code></pre>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 130" role="img" aria-label="A scale from minus 1 (opposite) through 0 (not related) to 1 (very similar). Cat versus car scores minus 0.4367; cat versus kitten scores 0.996.">
+            <!-- scale: -1 at x=40, 0 at x=380, 1 at x=720 -->
+            <line x1="40" y1="70" x2="720" y2="70" class="d-line"/>
+            <line x1="40" y1="62" x2="40" y2="78" class="d-line"/>
+            <line x1="380" y1="62" x2="380" y2="78" class="d-line"/>
+            <line x1="720" y1="62" x2="720" y2="78" class="d-line"/>
+            <text x="40" y="98" text-anchor="start" class="d-small d-mono">−1</text>
+            <text x="40" y="116" text-anchor="start" class="d-muted">opposite</text>
+            <text x="380" y="98" text-anchor="middle" class="d-small d-mono">0</text>
+            <text x="380" y="116" text-anchor="middle" class="d-muted">not related</text>
+            <text x="720" y="98" text-anchor="end" class="d-small d-mono">1</text>
+            <text x="720" y="116" text-anchor="end" class="d-muted">very similar</text>
+
+            <circle cx="232" cy="70" r="7" class="d-box"/>
+            <text x="232" y="34" text-anchor="middle" class="d-small">cat vs car</text>
+            <text x="232" y="52" text-anchor="middle" class="d-muted d-mono">−0.4367</text>
+            <circle cx="719" cy="70" r="7" class="d-box ok"/>
+            <text x="712" y="34" text-anchor="end" class="d-small d-label-ok">cat vs kitten</text>
+            <text x="712" y="52" text-anchor="end" class="d-muted d-mono">0.996</text>
+          </svg>
+        </div>
+        <figcaption>Where the two comparisons land on the cosine similarity scale.</figcaption>
+      </figure>
+      <p>Cat vs kitten: <strong>0.996</strong>, nearly the same meaning. Cat vs car: <strong>−0.4367</strong>, unrelated (negative only because of the made-up vectors). Vector databases run this same calculation when they search.</p>
+
+      <h2 id="high-dim">Visualizing real embeddings</h2>
+      <p>
+        Only up to 3 dimensions can be plotted. To see 1,500-dimension embeddings,
+        <a href="background-concepts.html#pca" title="Background concepts">PCA</a> (a dimensionality reduction technique) squeezes each vector to 2
+        dimensions; the words then form clusters like the plot above.
+      </p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>Dimensions</strong> = how many numbers per vector; set by the model, unnamed.</li>
+        <li><strong>Similar words cluster</strong> when plotted.</li>
+        <li><strong>Cosine similarity</strong>: close to 1 similar, 0 unrelated, −1 opposite.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="17-introduction-to-embeddings-and-vector-databases.html"><small>← Previous</small><span>Embeddings and vector databases</span></a>
+        <a class="next" href="19-hugging-face-embeddings.html"><small>Next →</small><span>Creating embeddings with Hugging Face</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MMR Retriever</title>
+  <meta name="description" content="Implementing an MMR retriever in LangChain with search_type='mmr' on a FAISS store, and using it in a create_retrieval_chain RAG pipeline.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html" aria-current="page">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 7 · Lesson 45</p>
+      <h1>MMR Retriever in LangChain</h1>
+
+      <p class="lead">The theory took a lesson; the code takes one argument.</p>
+
+      <pre><code>from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.document_loaders import TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chat_models import init_chat_model
+from langchain_core.prompts import PromptTemplate
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain</code></pre>
+      <pre><code># Step 1: load and chunk the documents
+loader = TextLoader("langchain_rag_dataset.txt")
+raw_docs = loader.load()
+
+splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+chunks = splitter.split_documents(raw_docs)</code></pre>
+      <pre><code># Step 2: FAISS with Hugging Face embeddings
+embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+vectorstore = FAISS.from_documents(chunks, embedding_model)</code></pre>
+
+      <h2 id="mmr">The MMR retriever</h2>
+      <pre><code># Step 3: MMR retriever
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={"k": 3},
+)</code></pre>
+      <p><code>search_type="mmr"</code> is the only change; without it you get plain similarity search.</p>
+      <div class="callout">
+        <span class="callout-title">Tuning (not shown in the video)</span>
+        <p><code>fetch_k</code> (default 20): how many similar candidates are fetched first; MMR picks <code>k</code> of them. <code>lambda_mult</code> (default 0.5): the λ from <a href="44-maximal-marginal-relevance.html#formula">Lesson 44</a>. E.g. <code>search_kwargs={"k": 3, "fetch_k": 20, "lambda_mult": 0.7}</code>.</p>
+      </div>
+
+      <h2 id="chain">In the RAG chain</h2>
+      <pre><code>prompt = PromptTemplate.from_template("""Answer the question based on the context provided.
+
+Context:
+{context}
+
+Question: {input}""")
+
+llm = init_chat_model("groq:gemma2-9b-it")
+
+document_chain = create_stuff_documents_chain(llm=llm, prompt=prompt)
+rag_chain = create_retrieval_chain(retriever=retriever, combine_docs_chain=document_chain)</code></pre>
+      <pre><code>query = "How does LangChain support agents and memory?"
+response = rag_chain.invoke({"input": query})
+
+print(response["answer"])
+# "LangChain supports agents by letting LLMs act as decision makers ... It supports memory ..."
+
+for doc in response["context"]:
+    print("-", doc.page_content)     # the 3 chunks MMR selected</code></pre>
+      <p><code>response["context"]</code> shows the three chunks MMR chose: relevant, but covering different points instead of repeating one.</p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong><code>as_retriever(search_type="mmr", ...)</code></strong> makes any vector store an MMR retriever.</li>
+        <li><strong><code>fetch_k</code> and <code>lambda_mult</code></strong> tune candidates and diversity.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="44-maximal-marginal-relevance.html"><small>← Previous</small><span>Maximal marginal relevance (MMR)</span></a>
+        <a class="next" href="46-when-to-use-mmr.html"><small>Next →</small><span>When to use MMR</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

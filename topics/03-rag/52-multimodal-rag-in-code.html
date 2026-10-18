@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multimodal RAG in Code</title>
+  <meta name="description" content="Implementing multimodal RAG over a PDF with text and a chart: PyMuPDF extraction, CLIP embeddings for text and images, FAISS.from_embeddings, vector search, and a GPT-4.1 message with text and base64 images.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html" aria-current="page">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 9 · Lesson 52</p>
+      <h1>Multimodal RAG in Code</h1>
+
+      <p class="lead">
+        A PDF with a short text and a bar chart: extract both, embed both with CLIP, search, and
+        let GPT-4.1 answer from text and image. The text never describes the bars, so questions
+        about the chart need the image.
+      </p>
+
+      <h2 id="imports">Setup</h2>
+      <pre><code>import fitz                                   # PyMuPDF
+import io, base64, os
+import numpy as np
+import torch
+from PIL import Image
+from transformers import CLIPProcessor, CLIPModel
+from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage
+from langchain.chat_models import init_chat_model
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from dotenv import load_dotenv
+
+load_dotenv()
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")   # for GPT-4.1, not for CLIP</code></pre>
+      <p>PDFs are read with <strong>PyMuPDF</strong> (<code>fitz</code>), which is fast and good at extracting both text and images. CLIP runs on <a href="background-concepts.html#pytorch" title="Background concepts">PyTorch</a>; the OpenAI key is for GPT-4.1.</p>
+      <pre><code># Initialize CLIP for unified embeddings
+clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+clip_model.eval()</code></pre>
+      <p><code>openai/clip-vit-base-patch32</code> turns text and images into <strong>512-dimension</strong> vectors; the processor converts raw input into the format the model expects.</p>
+
+      <h2 id="embed">Embedding text and images</h2>
+      <pre><code>def embed_image(image_data):
+    """Embed an image using CLIP"""
+    if isinstance(image_data, str):          # a file path
+        image = Image.open(image_data).convert("RGB")
+    else:                                    # already a PIL image
+        image = image_data
+
+    inputs = clip_processor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        features = clip_model.get_image_features(**inputs)
+        features = features / features.norm(dim=-1, keepdim=True)   # unit vector
+        return features.squeeze().numpy()
+
+
+def embed_text(text):
+    """Embed text using CLIP"""
+    inputs = clip_processor(
+        text=text,
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=77,
+    )
+    with torch.no_grad():
+        features = clip_model.get_text_features(**inputs)
+        features = features / features.norm(dim=-1, keepdim=True)
+        return features.squeeze().numpy()</code></pre>
+      <p>
+        One model, two entry points (<code>get_image_features</code>, <code>get_text_features</code>).
+        Each vector is <strong>normalised</strong> to length 1, so text and image vectors are
+        directly comparable.
+      </p>
+      <div class="callout warn">
+        <span class="callout-title">CLIP reads only 77 tokens</span>
+        <p>Longer text is cut off before embedding, so keep text chunks short.</p>
+      </div>
+
+      <h2 id="process">Processing the PDF</h2>
+      <pre><code>pdf_path = "multimodal_sample.pdf"
+doc = fitz.open(pdf_path)
+
+all_docs = []
+all_embeddings = []
+image_data_store = {}        # image_id -> base64 string
+
+splitter = RecursiveCharacterTextSplitter(chunk_size=..., chunk_overlap=...)
+
+for i, page in enumerate(doc):
+    # --- Process text ---
+    text = page.get_text()
+    if text.strip():
+        temp_doc = Document(page_content=text, metadata={"page": i, "type": "text"})
+        text_chunks = splitter.split_documents([temp_doc])
+        for chunk in text_chunks:
+            embedding = embed_text(chunk.page_content)
+            all_embeddings.append(embedding)
+            all_docs.append(chunk)
+
+    # --- Process images ---
+    for img_index, img in enumerate(page.get_images(full=True)):
+        try:
+            xref = img[0]
+            base_image = doc.extract_image(xref)
+            image_bytes = base_image["image"]
+
+            # 1. Convert to a PIL image
+            pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            image_id = f"page_{i}_img_{img_index}"
+
+            # 2. Store as base64 for the multimodal LLM
+            buffered = io.BytesIO()
+            pil_image.save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode()
+            image_data_store[image_id] = img_base64
+
+            # 3. Create a CLIP embedding for retrieval
+            embedding = embed_image(pil_image)
+            all_embeddings.append(embedding)
+
+            image_doc = Document(
+                page_content=f"[Image: {image_id}]",
+                metadata={"page": i, "type": "image", "image_id": image_id},
+            )
+            all_docs.append(image_doc)
+        except Exception as e:
+            print(f"Error processing image {img_index} on page {i}: {e}")
+
+doc.close()</code></pre>
+      <div class="split">
+        <div>
+          <h4>Text, per page</h4>
+          <p>Get the text, wrap it in a Document tagged <code>"type": "text"</code>, chunk it, embed each chunk.</p>
+        </div>
+        <div>
+          <h4>Images, per page</h4>
+          <p>Extract each image, store it as base64 under an ID, embed it, and add a placeholder Document tagged <code>"type": "image"</code> with that ID.</p>
+        </div>
+      </div>
+      <p>Result: 2 Documents (one text, one image) and their two vectors. The <code>type</code> tag is how they're told apart later.</p>
+
+      <h2 id="store">Storing and searching</h2>
+      <pre><code>embeddings_array = np.array(all_embeddings)
+
+vector_store = FAISS.from_embeddings(
+    text_embeddings=[(doc.page_content, emb) for doc, emb in zip(all_docs, embeddings_array)],
+    embedding=None,                                  # embeddings already computed
+    metadatas=[doc.metadata for doc in all_docs],
+)</code></pre>
+      <p>The vectors were already made by CLIP, so <code>from_embeddings</code> stores them as-is (no embedding model in the store).</p>
+      <pre><code>llm = init_chat_model("openai:gpt-4.1")      # a multimodal LLM
+
+def retrieve_multimodal(query, k=5):
+    """Unified retrieval using CLIP embeddings for both text and images"""
+    query_embedding = embed_text(query)
+    results = vector_store.similarity_search_by_vector(embedding=query_embedding, k=k)
+    return results</code></pre>
+      <p>For the same reason, search uses <code>similarity_search_by_vector</code> with the CLIP-embedded query; the results can be text <em>or</em> images.</p>
+
+      <h2 id="message">The message for the LLM</h2>
+      <pre><code>def create_multimodal_message(query, retrieved_docs):
+    """Create a message with both text and images for GPT-4.1"""
+    content = []
+    content.append({"type": "text", "text": f"Question: {query}\n\nContext:\n"})
+
+    # Separate text and image documents
+    text_docs = [d for d in retrieved_docs if d.metadata.get("type") == "text"]
+    image_docs = [d for d in retrieved_docs if d.metadata.get("type") == "image"]
+
+    if text_docs:
+        text_context = "\n\n".join(
+            f"[Page {d.metadata['page']}]: {d.page_content}" for d in text_docs
+        )
+        content.append({"type": "text", "text": f"Text excerpts:\n{text_context}\n"})
+
+    for d in image_docs:
+        image_id = d.metadata.get("image_id")
+        if image_id and image_id in image_data_store:
+            content.append({"type": "text", "text": f"\n[Image from page {d.metadata['page']}]:\n"})
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{image_data_store[image_id]}"},
+            })
+
+    content.append({"type": "text", "text": "\n\nPlease answer the question based on the provided text and images."})
+    return HumanMessage(content=content)</code></pre>
+      <p>
+        A multimodal LLM takes one message made of parts: text parts for the question and text
+        chunks, and <code>image_url</code> parts holding each retrieved image as a
+        <a href="background-concepts.html#base64" title="Background concepts">base64 data URL</a>. That's why the images were kept as base64.
+      </p>
+
+      <h2 id="pipeline">Results</h2>
+      <pre><code>def multimodal_pdf_rag_pipeline(query):
+    context_docs = retrieve_multimodal(query, k=5)
+    message = create_multimodal_message(query, context_docs)
+    response = llm.invoke([message])
+
+    print(f"Retrieved {len(context_docs)} documents:")
+    for d in context_docs:
+        kind = d.metadata.get("type")
+        print(f"- {kind} from page {d.metadata['page']}")
+    return response.content
+
+if __name__ == "__main__":
+    queries = [
+        "What does the chart on page 1 show about revenue trends?",
+        "Summarize the main findings from the document",
+        "What visual elements are present in the document?",
+    ]
+    for q in queries:
+        print(q)
+        print(multimodal_pdf_rag_pipeline(q))</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Question</th><th>GPT-4.1's answer</th></tr></thead>
+          <tbody>
+            <tr><td>What does the chart on page 1 show about revenue trends?</td><td>Revenue increased steadily over three quarters; Q1 was lowest (the <em>blue bar</em>)…</td></tr>
+            <tr><td>Summarize the main findings</td><td>Steady growth: the bars rise from left to right, matching the text.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="keyidea">The answer describes bar colours and heights, information that exists only in the image.</p>
+      <p>(Page numbers in metadata start at 0, so page 0 is "page 1".)</p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>PyMuPDF</strong> extracts text and images; <strong>CLIP</strong> embeds both into one space.</li>
+        <li><strong>Tag Documents by type</strong> and keep images as base64.</li>
+        <li><strong>Precomputed vectors</strong>: <code>from_embeddings</code> to store, <code>similarity_search_by_vector</code> to search.</li>
+        <li><strong>Send text and image parts</strong> together to a multimodal LLM.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="51-multimodal-rag.html"><small>← Previous</small><span>Multimodal RAG</span></a>
+        <a class="next" href="53-ai-agents-vs-agentic-ai.html"><small>Next →</small><span>AI agents vs agentic AI</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

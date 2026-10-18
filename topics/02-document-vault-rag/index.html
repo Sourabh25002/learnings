@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Document Vault (RAG)</title>
+  <meta name="description" content="Chapter 2: the Document Vault, a RAG pipeline for chatting with uploaded PDFs.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ Document Vault (RAG)</span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html" aria-current="page">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Chapter 2</p>
+      <h1>Document Vault (RAG)</h1>
+
+      <p class="lead">
+        The Document Vault lets users upload their PDFs and ask questions about them in plain
+        language. Behind it is a RAG pipeline: upload, background processing, text extraction,
+        chunking, embeddings and a vector database, then search and an AI-written answer. This
+        chapter follows one file through all of it.
+      </p>
+
+      <div class="callout">
+        <span class="callout-title">What this chapter is (and isn't)</span>
+        <p>
+          It's a study of <strong>the real Doc Vault code</strong> in the <code>pythoncode</code>
+          repo: what each part does, why it's built that way, and every gap found along the way.
+          The ideas (RAG, chunking, embeddings, vector search) apply to any stack, including Node.js.
+          Lessons are written as each part is studied; dashed cards aren't written yet.
+        </p>
+      </div>
+
+      <h2>Lessons</h2>
+      <!-- When a lesson is written: remove "upcoming" from its card and fill in card-desc -->
+      <div class="cards">
+        <a class="card" href="01-what-is-the-doc-vault.html">
+          <span class="card-num">Lesson 1</span>
+          <span class="card-title">What is the Document Vault?</span>
+          <span class="card-desc">The two halves (prepare, then answer), what RAG means, why not send the whole PDF, file statuses, and which files to read or ignore.</span>
+        </a>
+        <a class="card" href="02-how-the-backend-is-organized.html">
+          <span class="card-num">Lesson 2</span>
+          <span class="card-title">How the backend is organized</span>
+          <span class="card-desc">Flask for Node.js developers: folders, Blueprints and decorators, request/response syntax, one request's journey, and the production setup.</span>
+        </a>
+        <a class="card" href="03-uploading-a-file.html">
+          <span class="card-num">Lesson 3</span>
+          <span class="card-title">Uploading a file</span>
+          <span class="card-desc">The /upload route step by step, the 100MB quota (my work), the vaultFiles table, and eight edge cases.</span>
+        </a>
+        <a class="card" href="04-the-background-worker.html">
+          <span class="card-num">Lesson 4</span>
+          <span class="card-title">The background worker</span>
+          <span class="card-desc">Cron outside the code, why a separate program, the file lock, batches of 10, internal APIs, processFile, and how to scale.</span>
+        </a>
+        <a class="card" href="05-getting-text-out-of-a-pdf.html">
+          <span class="card-num">Lesson 5</span>
+          <span class="card-title">Getting text out of a PDF</span>
+          <span class="card-desc">PDF vs .txt, digital vs scanned, OCR and Textract, the libraries, extractPdfPageWise, a worked example, and the bugs.</span>
+        </a>
+        <a class="card" href="06-chunking.html">
+          <span class="card-num">Lesson 6</span>
+          <span class="card-title">Chunking</span>
+          <span class="card-desc">Why chunk, paragraphs and the sliding window, overlap, metadata and IDs, and the unused chunker.py.</span>
+        </a>
+        <a class="card" href="07-embeddings.html">
+          <span class="card-num">Lesson 7</span>
+          <span class="card-title">Embeddings</span>
+          <span class="card-desc">Text as 768 numbers, why that makes search work, the local bge model, batches, and the fallback-model trap.</span>
+        </a>
+        <a class="card" href="08-vector-database.html">
+          <span class="card-num">Lesson 8</span>
+          <span class="card-title">Storing vectors: ChromaDB and S3</span>
+          <span class="card-desc">What a vector database is, one ChromaDB folder per document, S3 backup, marking the file completed.</span>
+        </a>
+        <a class="card upcoming" href="09-finding-relevant-chunks.html">
+          <span class="card-num">Lesson 9</span>
+          <span class="card-title">Finding the right pieces: search and reranking</span>
+          <span class="card-desc"></span>
+        </a>
+        <a class="card upcoming" href="10-generating-the-answer.html">
+          <span class="card-num">Lesson 10</span>
+          <span class="card-title">Generating the answer with Gemini</span>
+          <span class="card-desc"></span>
+        </a>
+        <a class="card upcoming" href="11-deleting-and-cleanup.html">
+          <span class="card-num">Lesson 11</span>
+          <span class="card-title">Deleting files and cleanup</span>
+          <span class="card-desc"></span>
+        </a>
+        <a class="card" href="12-gaps-and-improvements.html">
+          <span class="card-num">Lesson 12</span>
+          <span class="card-title">Known gaps and improvements</span>
+          <span class="card-desc">Security, correctness and reliability gaps found so far, wasted work, and good first tickets.</span>
+        </a>
+        <a class="card upcoming" href="13-interview-questions.html">
+          <span class="card-num">Lesson 13</span>
+          <span class="card-title">Interview questions &amp; answers</span>
+          <span class="card-desc"></span>
+        </a>
+      </div>
+
+      <h2>Glossary</h2>
+      <dl class="glossary">
+        <!-- Add terms as they come up: <dt>Term</dt><dd>Meaning</dd> -->
+        <dt>RAG</dt>
+        <dd>Retrieval-Augmented Generation: find the relevant pieces of your documents, then give only those to the AI along with the question.</dd>
+
+        <dt>Chunk</dt>
+        <dd>A small piece of a document's text (here, up to 1,000 characters). The unit that gets searched.</dd>
+
+        <dt>Overlap</dt>
+        <dd>The part each chunk shares with the previous one (here, 200 characters), so sentences cut at a boundary still appear whole somewhere.</dd>
+
+        <dt>Embedding</dt>
+        <dd>A list of numbers representing a text's meaning. Similar meanings give similar numbers.</dd>
+
+        <dt>Vector</dt>
+        <dd>A list of numbers. An embedding is a vector.</dd>
+
+        <dt>Vector database</dt>
+        <dd>A database that finds stored items whose vectors are closest to a given vector, i.e. search by meaning.</dd>
+
+        <dt>ChromaDB</dt>
+        <dd>The vector database used here. Stored as files in a folder, like SQLite. One per document.</dd>
+
+        <dt>Collection</dt>
+        <dd>A ChromaDB "table". Ours is called <code>financial_documents</code>.</dd>
+
+        <dt>Metadata</dt>
+        <dd>The label attached to each chunk: file name, page number, chunk position, text or table.</dd>
+
+        <dt>docName</dt>
+        <dd>A document's unique ID in the RAG system: its S3 file name without folder or extension, e.g. <code>42_1760345678123</code>.</dd>
+
+        <dt>indexS3Key</dt>
+        <dd>The S3 folder where a document's ChromaDB index is backed up, e.g. <code>vaultFile/42_1760345678123/</code>.</dd>
+
+        <dt>Digital PDF</dt>
+        <dd>A PDF made by software, with its text stored inside. What the Vault supports.</dd>
+
+        <dt>Scanned PDF</dt>
+        <dd>A PDF where each page is an image (a scan or photo). Has no stored text.</dd>
+
+        <dt>OCR</dt>
+        <dd>Optical Character Recognition: reading text from an image by recognising letter shapes.</dd>
+
+        <dt>AWS Textract</dt>
+        <dd>Amazon's paid OCR service. Its code exists in the repo but isn't used.</dd>
+
+        <dt>pdfplumber</dt>
+        <dd>The Python library that reads the text out of each PDF page in the Vault.</dd>
+
+        <dt>Camelot</dt>
+        <dd>A Python library that finds tables in PDFs, with a confidence score per table.</dd>
+
+        <dt>PyMuPDF (fitz)</dt>
+        <dd>A fast PDF library. Used here to open PDFs and handle passwords.</dd>
+
+        <dt>FastEmbed</dt>
+        <dd>The library that runs the embedding model locally on our server.</dd>
+
+        <dt>Blueprint</dt>
+        <dd>Flask's version of <code>express.Router()</code>.</dd>
+
+        <dt>Decorator</dt>
+        <dd>A line starting with <code>@</code> above a function that adds behaviour to it, e.g. registering a route or checking auth.</dd>
+
+        <dt>Docstring</dt>
+        <dd>A function's description in triple quotes, as its first line. Like a JSDoc comment.</dd>
+
+        <dt>Cron</dt>
+        <dd>Linux's built-in scheduler. Runs the worker every 5 minutes here.</dd>
+
+        <dt>supervisord</dt>
+        <dd>A process manager (like pm2) that runs gunicorn and cron side by side in one container.</dd>
+
+        <dt>gunicorn</dt>
+        <dd>The production web server that runs the Flask app.</dd>
+
+        <dt>Lock file</dt>
+        <dd>A file whose existence means "a run is in progress", so overlapping cron runs exit.</dd>
+
+        <dt>Stale lock</dt>
+        <dd>A lock left behind by a crashed run. Here, any lock older than 2 hours.</dd>
+
+        <dt>Quota</dt>
+        <dd>Each user's lifetime upload limit: 100MB, tracked in the <code>userFileQuota</code> table.</dd>
+      </dl>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a class="next" href="01-what-is-the-doc-vault.html"><small>Start</small><span>What is the Document Vault?</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

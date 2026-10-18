@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Background Concepts</title>
+  <meta name="description" content="Plain-language explanations of terms the course uses without explaining: LLMs, tokens, agentic AI, LangChain, model providers, vector databases and more.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html" aria-current="page">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Reference</p>
+      <h1>Background Concepts</h1>
+
+      <p class="lead">
+        The course mentions some terms without explaining them, assuming you already know them.
+        This page explains each one in plain language. Lessons link here the first time a term
+        comes up.
+      </p>
+
+      <div class="callout">
+        <span class="callout-title">Not from the course</span>
+        <p>
+          Everything on this page is extra background, written to fill gaps. The lessons
+          themselves stick to what the videos say. Terms the course explains on its own (like
+          embeddings, vector databases or similarity search) aren't repeated here.
+        </p>
+      </div>
+
+      <div class="toc">
+        <strong>On this page</strong>
+        <ol>
+          <li><a href="#ai-basics">AI basics</a></li>
+          <li><a href="#models">Models and providers</a></li>
+          <li><a href="#langchain-family">LangChain, LangGraph, LangSmith</a></li>
+          <li><a href="#vector-dbs">The vector databases named in the course</a></li>
+          <li><a href="#fine-tuning-terms">Fine-tuning terms</a></li>
+          <li><a href="#other">Other terms</a></li>
+        </ol>
+      </div>
+
+      <!-- ───────────── AI basics ───────────── -->
+      <h2 id="ai-basics">AI basics</h2>
+
+      <h3 id="generative-ai">Generative AI</h3>
+      <p>
+        AI that <strong>creates new content</strong> (text, images, code, audio) instead of just
+        sorting or labelling existing data. ChatGPT writing an email is generative AI; a spam
+        filter marking an email as spam is not.
+      </p>
+
+      <h3 id="deep-learning">Deep learning</h3>
+      <p>
+        A branch of machine learning that uses large <strong>neural networks</strong>: many layers
+        of simple maths units that learn patterns by being shown huge amounts of examples.
+        Embedding models and LLMs are both deep learning models.
+      </p>
+
+      <h3 id="llm">LLM (Large Language Model)</h3>
+      <p>
+        An AI model trained on a huge amount of text so it can understand and write language.
+        At its core it does one thing: given some text, predict the next piece of text, over
+        and over. That's enough for it to answer questions, summarise, write code and chat.
+      </p>
+      <ul>
+        <li><strong>Large</strong> because it has billions of <a href="#parameters">parameters</a> and was trained on a big chunk of the internet, books and code.</li>
+        <li>It only knows what was in its training data, up to the date that data ends. That gap is exactly what RAG fills.</li>
+        <li>Examples: GPT-4 (OpenAI), Gemini (Google), Llama (Meta), Claude (Anthropic).</li>
+      </ul>
+
+      <h3 id="transformer">Transformer</h3>
+      <p>
+        The model design (architecture) almost every modern LLM is built on, introduced by
+        Google researchers in the 2017 paper <em>"Attention Is All You Need"</em>. Its key idea,
+        <strong>attention</strong>, lets the model look at all the words in a text at once and
+        work out which ones matter for each other (e.g. that "it" in a sentence refers to "the
+        bank"). That made models much better at understanding context and much faster to train,
+        which is what made today's LLMs possible. The "T" in GPT stands for Transformer.
+      </p>
+
+      <h3 id="parameters">Parameters (weights)</h3>
+      <p>
+        The numbers inside a model that it learned during training. Everything the model "knows"
+        is stored in them. "Llama 3 8B" means the model has about 8 billion parameters.
+        <strong>Training</strong> and <strong>fine-tuning</strong> change these numbers;
+        <strong>prompting</strong> and <strong>RAG</strong> don't touch them.
+      </p>
+
+      <h3 id="token">Token</h3>
+      <p>
+        The unit of text an LLM reads and writes. A token is usually a word or part of a word:
+        "unbelievable" might be split into "un", "believ", "able". As a rough guide, 100 tokens is
+        about 75 English words.
+      </p>
+      <ul>
+        <li><strong>Token limit / context window</strong> is the maximum number of tokens a model can handle at once (your input plus its output). This is why RAG sends a few relevant chunks instead of whole documents.</li>
+        <li>API pricing is usually per token, so fewer tokens means cheaper calls.</li>
+        <li>Each model family has its own way of splitting text into tokens (its <em>tokenizer</em>). <code>tiktoken</code> is OpenAI's tokenizer library, used to count tokens the way their models do.</li>
+      </ul>
+
+      <h3 id="agentic">Agentic AI and agentic RAG</h3>
+      <p>
+        A normal LLM call is one step: question in, answer out. An <strong>agent</strong> is an
+        LLM that can <strong>decide what to do next</strong>: pick a tool, call it, look at the
+        result, and decide whether to do something else, looping until the task is done.
+      </p>
+      <div class="split">
+        <div>
+          <h4>Normal (traditional) RAG</h4>
+          <p>Always retrieves once, then answers. Fixed steps.</p>
+        </div>
+        <div>
+          <h4>Agentic RAG</h4>
+          <p>
+            The agent decides <em>whether</em> to retrieve, <em>which</em> source to search,
+            rewrites the query if the results are poor, and may retrieve several times before
+            answering.
+          </p>
+        </div>
+      </div>
+      <p>
+        From Section 10 on, the course draws a sharper line: an <strong>AI agent</strong> is a
+        single program doing one specific task, while <strong>agentic AI</strong> is a system of
+        several agents collaborating towards a larger goal
+        (<a href="53-ai-agents-vs-agentic-ai.html">Lesson 53</a>).
+      </p>
+
+      <!-- ───────────── Models and providers ───────────── -->
+      <h2 id="models">Models and providers</h2>
+
+      <h3 id="open-vs-closed">Open-source vs closed models</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Closed models</th><th>Open-source (open-weight) models</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Examples</strong></td><td>GPT-4 (OpenAI), Gemini (Google)</td><td>Llama (Meta), Mistral</td></tr>
+            <tr><td><strong>How you use them</strong></td><td>Only through the company's API</td><td>Download and run them yourself, or use a host like Groq</td></tr>
+            <tr><td><strong>Cost</strong></td><td>Pay per token</td><td>Free to download; you pay for the hardware or the host</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="providers">The providers named in the course</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>What it is</th></tr></thead>
+          <tbody>
+            <tr><td><strong>OpenAI</strong></td><td>The company behind ChatGPT and the GPT models. Also sells embedding models. Paid API.</td></tr>
+            <tr><td><strong>Google Gemini</strong></td><td>Google's family of LLMs, used through Google's API.</td></tr>
+            <tr><td><strong>Llama</strong></td><td>Meta's family of open-weight LLMs. Anyone can download and run them.</td></tr>
+            <tr><td id="groq"><strong>Groq</strong></td><td>A company that <em>hosts</em> open models (like Llama) and runs them very fast on its own chips. You call them through Groq's API, with a free tier. Not to be confused with xAI's <em>Grok</em> model.</td></tr>
+            <tr><td id="hugging-face"><strong>Hugging Face</strong></td><td>The main website for sharing open-source AI models and datasets, like GitHub for AI models. Most free embedding models come from here.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ───────────── LangChain family ───────────── -->
+      <h2 id="langchain-family">LangChain, LangGraph, LangSmith</h2>
+
+      <h3 id="langchain">LangChain</h3>
+      <p class="keyidea">
+        LangChain is a Python library that gives you ready-made building blocks for every step
+        of an LLM app, so you don't have to write the plumbing yourself.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>RAG step</th><th>Without LangChain</th><th>LangChain gives you</th></tr></thead>
+          <tbody>
+            <tr><td>Read files</td><td>Separate code for PDF, Word, CSV, web…</td><td><strong>Document loaders</strong>, all returning the same <code>Document</code> shape</td></tr>
+            <tr><td>Chunk</td><td>Your own splitting logic</td><td><strong>Text splitters</strong></td></tr>
+            <tr><td>Embed</td><td>Each provider's own API</td><td>One <strong>embeddings</strong> interface</td></tr>
+            <tr><td>Store and search</td><td>Each vector database's own API</td><td>One <strong>vector store</strong> interface</td></tr>
+            <tr><td>Generate</td><td>Each LLM provider's own API</td><td>One <strong>chat model</strong> interface</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        You <em>can</em> do every step yourself with plain Python. LangChain just makes it
+        shorter, and lets you <strong>swap pieces</strong> (FAISS → Pinecone, OpenAI → Groq)
+        with a one-line change. For example, reading and chunking a PDF:
+      </p>
+      <div class="split">
+        <div>
+          <h4>On your own</h4>
+          <pre><code>from pypdf import PdfReader
+
+reader = PdfReader("policy.pdf")
+chunks = []
+for n, page in enumerate(reader.pages):
+    text = page.extract_text()
+    for i in range(0, len(text), 800):
+        chunks.append({
+            "text": text[i:i + 1000],
+            "source": "policy.pdf",
+            "page": n + 1,
+        })</code></pre>
+        </div>
+        <div>
+          <h4>With LangChain</h4>
+          <pre><code>from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+docs = PyPDFLoader("policy.pdf").load()
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000, chunk_overlap=200)
+chunks = splitter.split_documents(docs)</code></pre>
+        </div>
+      </div>
+      <p>
+        Is it still the standard? It's the most widely used framework of its kind, but not the
+        only one: <strong>LlamaIndex</strong> is the main alternative (strong for RAG), and many
+        production teams skip frameworks and call the LLM and vector database SDKs directly. The
+        RAG steps you learn are the same either way.
+      </p>
+      <div class="callout warn">
+        <span class="callout-title">Version note</span>
+        <p>
+          The course uses LangChain <strong>v0.3</strong>. LangChain <strong>1.0</strong> was
+          released in late 2025. The core ideas are the same, but some import paths moved, e.g.
+          text splitters now come from <code>langchain_text_splitters</code>. If course code fails
+          on a newer install, check the version first.
+        </p>
+      </div>
+
+      <h3 id="langgraph">LangGraph</h3>
+      <p>
+        A library from the same team for building <strong>multi-step and agent workflows</strong>.
+        You draw the workflow as a graph: steps are nodes, arrows decide what runs next, and it
+        can loop (e.g. "retrieve → check if results are good → if not, rewrite the query and
+        retrieve again"). It's the usual tool for <a href="#agentic">agentic RAG</a>.
+      </p>
+
+      <h3 id="langsmith">LangSmith</h3>
+      <p>
+        A web dashboard from the same team for <strong>seeing what happened inside each run</strong>
+        of your app: which chunks were retrieved, what prompt went to the LLM, how long each step
+        took, what it cost. Used for debugging and evaluating quality.
+      </p>
+
+      <!-- ───────────── Vector databases ───────────── -->
+      <h2 id="vector-dbs">The vector databases named in the course</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>What it is</th><th>Where it runs</th></tr></thead>
+          <tbody>
+            <tr><td><strong>FAISS</strong></td><td>"Facebook AI Similarity Search", a library from Meta for fast vector search. More a search engine than a full database.</td><td>On your machine, in memory (can be saved to a file)</td></tr>
+            <tr><td><strong>ChromaDB</strong></td><td>An open-source vector database that's easy to start with. (The Doc Vault in Chapter 2 uses it.)</td><td>On your machine, saved to a folder; also has a server mode</td></tr>
+            <tr><td><strong>Pinecone</strong></td><td>A fully managed vector database: they run it, you call it through an API.</td><td>In the cloud (paid, with a free tier)</td></tr>
+            <tr><td><strong>DataStax</strong></td><td>The company behind Astra DB, a cloud database with vector search built in.</td><td>In the cloud</td></tr>
+            <tr><td><strong>Qdrant</strong></td><td>An open-source vector database written in Rust, known for strong metadata filtering.</td><td>Locally (e.g. in Docker) or in Qdrant's cloud</td></tr>
+            <tr><td><strong>Milvus</strong></td><td>An open-source vector database built for very large scale (billions of vectors), with a managed version called Zilliz Cloud.</td><td>Self-hosted cluster or in the cloud</td></tr>
+            <tr><td><strong>Vespa</strong></td><td>An open-source search and serving engine (originally from Yahoo) that combines vector search with text search and ranking.</td><td>Self-hosted or Vespa Cloud</td></tr>
+            <tr><td><strong>ScaNN</strong></td><td>"Scalable Nearest Neighbors", a vector search library from Google Research.</td><td>On your machine, as a library</td></tr>
+            <tr><td><strong>NMSLIB</strong></td><td>"Non-Metric Space Library", an open-source library for fast approximate nearest-neighbour search.</td><td>On your machine, as a library</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ───────────── Fine-tuning terms ───────────── -->
+      <h2 id="fine-tuning-terms">Fine-tuning terms</h2>
+
+      <h3 id="lora">LoRA and QLoRA</h3>
+      <p>
+        Cheaper ways to fine-tune. Instead of changing all of a model's billions of
+        <a href="#parameters">parameters</a>, <strong>LoRA</strong> (Low-Rank Adaptation) freezes
+        them and trains a small set of extra numbers added on top. <strong>QLoRA</strong> does the
+        same on a compressed ("quantized") copy of the model, so it fits on a smaller GPU.
+      </p>
+
+      <h3 id="gpu">GPU</h3>
+      <p>
+        A graphics processor, a chip that does thousands of calculations in parallel. Training
+        and running large models needs this kind of parallel maths, so GPUs are the main cost of
+        fine-tuning. Companies usually rent them from cloud providers by the hour.
+      </p>
+
+      <!-- ───────────── Other ───────────── -->
+      <h2 id="other">Other terms</h2>
+
+      <h3 id="nlp">NLP (Natural Language Processing)</h3>
+      <p>
+        The field of AI about getting computers to work with human language: understanding,
+        translating, summarising. Turning words and sentences into vectors (embeddings) is an
+        idea that came from NLP, and LLMs are its biggest result.
+      </p>
+
+      <h3 id="structured-data">Structured vs unstructured data</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Structured</th><th>Unstructured</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Shape</strong></td><td>Fixed rows and columns; every row has the same fields</td><td>Free-flowing content with no fixed fields</td></tr>
+            <tr><td><strong>Examples</strong></td><td>CSV, Excel, database tables</td><td>Text files, PDFs, Word docs, emails, web pages</td></tr>
+            <tr><td><strong>For RAG</strong></td><td>Has to be turned into readable text per row/sheet; column values make great metadata</td><td>Has to be cleaned and split into chunks</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>JSON sits in between and is often called <em>semi-structured</em>: it has fields, but they can nest and vary.</p>
+
+      <h3 id="json">JSON</h3>
+      <p>
+        JavaScript Object Notation: the standard text format for sending data between programs,
+        and what most APIs return. It's made of <strong>key–value pairs</strong> in
+        <code>{ }</code> and <strong>lists</strong> in <code>[ ]</code>, which can nest inside each
+        other:
+      </p>
+      <pre><code>{"name": "Asha", "skills": ["Python", "SQL"], "manager": {"name": "Ravi"}}</code></pre>
+      <p>
+        A related format, <strong>JSON Lines</strong> (<code>.jsonl</code>), puts one JSON object
+        per line. It's common for logs and event streams, since new lines can be appended
+        without rewriting the file.
+      </p>
+
+      <h3 id="jq">jq</h3>
+      <p>A small query language for picking data out of JSON. A few patterns:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Query</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td><code>.company</code></td><td>The value of the <code>company</code> key</td></tr>
+            <tr><td><code>.employees</code></td><td>The whole <code>employees</code> list, as one value</td></tr>
+            <tr><td><code>.employees[]</code></td><td>Each item of the list, one at a time</td></tr>
+            <tr><td><code>.employees[].name</code></td><td>Each employee's name</td></tr>
+            <tr><td><code>.</code></td><td>The whole thing</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="pandas">pandas and DataFrames</h3>
+      <p>
+        <strong>pandas</strong> is the standard Python library for working with tables. A
+        <strong>DataFrame</strong> is its table object: rows and named columns, like a sheet in
+        Excel held in memory. <code>pd.read_csv()</code> and <code>pd.read_excel()</code> load
+        files into DataFrames; <code>df.iterrows()</code> walks through the rows one by one.
+      </p>
+
+      <h3 id="numpy">NumPy and Matplotlib</h3>
+      <p>
+        <strong>NumPy</strong> is the standard Python library for maths on lists of numbers
+        (arrays), which makes it a natural fit for vectors. <code>np.dot(a, b)</code> computes a
+        dot product and <code>np.linalg.norm(a)</code> a vector's magnitude.
+        <strong>Matplotlib</strong> is the standard Python plotting library;
+        <code>plt.scatter</code> draws points and <code>plt.annotate</code> labels them.
+      </p>
+
+      <h3 id="dense-vector">Dense vector</h3>
+      <p>
+        A vector where (almost) every number carries some value, like the 384 numbers an
+        embedding model outputs. The opposite is a <strong>sparse</strong> vector: very long and
+        mostly zeros, e.g. one slot per word in the vocabulary with a count only for the words
+        that appear. Embeddings are dense, which is why they can capture meaning in relatively
+        few numbers.
+      </p>
+
+      <h3 id="clustering">Clustering</h3>
+      <p>
+        Grouping items so that similar ones end up together, without being told the groups in
+        advance. With embeddings, that means grouping texts whose vectors are close, like the
+        cat/kitten, dog/puppy and car/truck groups in Lesson 18.
+      </p>
+
+      <h3 id="euclidean">Euclidean (L2) distance</h3>
+      <p>
+        The straight-line distance between two points, as with a ruler. For vectors: subtract
+        them number by number, square each difference, add them up, take the square root. Small
+        distance = the vectors are close = similar meaning. Unlike cosine similarity, which only
+        looks at the angle between vectors, Euclidean distance also notices differences in
+        length.
+      </p>
+      <p>
+        Chroma's default <code>l2</code> score is actually the <em>squared</em> distance (it
+        skips the square root). For vectors of length 1, which is what OpenAI's embeddings are,
+        it's tied directly to cosine similarity: <code>L2² = 2 − 2 × cosine</code>. So a Chroma
+        score of 0.23 corresponds to a cosine similarity of about 0.885, and the two always rank
+        results in the same order.
+      </p>
+
+      <h3 id="embedding-dimensions">Shortening embeddings (the dimensions parameter)</h3>
+      <p>
+        OpenAI's <code>text-embedding-3</code> models were trained so that the most important
+        information sits in the first numbers of each vector. Passing
+        <code>dimensions=1024</code> asks the API to return a shorter vector (1,024 instead of
+        1,536 for <code>3-small</code>) that keeps most of the quality. Shorter vectors take less
+        storage and search faster. The catch: every vector in one index must have the same
+        length, so the number must match what the vector database was set up with, and you
+        must use the same setting when embedding documents and queries.
+      </p>
+
+      <h3 id="pca">PCA and dimensionality reduction</h3>
+      <p>
+        <strong>Dimensionality reduction</strong> means turning vectors with many numbers into
+        vectors with fewer, while keeping as much of the important information as possible.
+        <strong>PCA (principal component analysis)</strong> is the classic way to do it: it
+        finds the few directions along which the data varies most and keeps only those. Reduce
+        1,500-dimensional embeddings to 2 and you can plot them; words that were close in 1,500
+        dimensions mostly stay close in 2.
+      </p>
+
+      <h3 id="sql">SQL databases, SQLite and JOINs</h3>
+      <p>
+        A <strong>SQL database</strong> stores data in tables (rows and columns) and is queried with
+        the SQL language (<code>SELECT … FROM … WHERE …</code>). Examples: PostgreSQL, MySQL, and
+        <strong>SQLite</strong>, a tiny SQL database that lives in a single file with no server,
+        which makes it handy for learning.
+      </p>
+      <ul>
+        <li><strong>Primary key:</strong> the column that uniquely identifies each row (usually <code>id</code>).</li>
+        <li><strong>Foreign key:</strong> a column that points to another table's primary key, linking the two (like <code>projects.lead_id → employees.id</code>).</li>
+        <li><strong>JOIN:</strong> a query that combines rows from linked tables. An <em>inner</em> join keeps only rows that match in both; a <em>left</em> join keeps every row from the first table even without a match.</li>
+        <li><strong>DDL:</strong> Data Definition Language, the statements that define tables (<code>CREATE TABLE …</code>).</li>
+      </ul>
+      <p>
+        <strong>NoSQL</strong> databases (like MongoDB) don't use fixed tables; they store
+        flexible, JSON-like documents instead.
+      </p>
+
+      <h3 id="api">API</h3>
+      <p>
+        A way for one program to talk to another. You send a request (e.g. "search the web for
+        today's AI news" or "embed this text") and get a response back. When the course says an
+        LLM uses a web search API, the LLM's app is sending requests to a search service.
+      </p>
+
+      <h3 id="api-key">API key</h3>
+      <p>
+        A secret string that identifies you to a paid service like OpenAI. You send it with
+        every API request so the provider knows whose account to bill and that you're allowed
+        to use it. Keep it private (e.g. in an environment variable, not in your code).
+      </p>
+
+      <h3 id="env-file">.env files and environment variables</h3>
+      <p>
+        An <strong>environment variable</strong> is a named value the operating system hands to
+        a running program, e.g. <code>OPENAI_API_KEY</code>. Libraries like LangChain's OpenAI
+        integration read the key from there, so it never has to be written in the code. A
+        <strong><code>.env</code> file</strong> is a plain text file of <code>NAME="value"</code>
+        lines kept in the project folder (and left out of git, so the secret isn't shared).
+        <code>load_dotenv()</code> from <code>python-dotenv</code> reads it and puts each value
+        into <code>os.environ</code>, unless a variable of that name already exists. So in most
+        cases the course's extra <code>os.environ[...] = os.getenv(...)</code> line just
+        reassigns a value that's already set; it does no harm.
+      </p>
+
+      <h3 id="knn">KNN (k-nearest neighbours)</h3>
+      <p>
+        A classic machine learning idea: to decide about a new point, look at the
+        <strong>k</strong> stored points closest to it (e.g. k = 3). In vector search, "closest"
+        means highest similarity (or smallest distance) to the query vector, so "find the k
+        nearest neighbours" just means "return the top k matches". Checking every stored vector
+        is exact but slow on huge collections; libraries like FAISS use clever indexes to find
+        <em>approximately</em> the nearest ones much faster.
+      </p>
+
+      <h3 id="crud">CRUD</h3>
+      <p>
+        Short for <strong>Create, Read, Update, Delete</strong>: the four basic things you can do
+        with records in a database. A vector database lets you add new vectors, fetch them,
+        change them (or their metadata) and remove them, like any other database.
+      </p>
+
+      <h3 id="distributed">Distributed systems: replication, sharding, high availability, scaling</h3>
+      <ul>
+        <li><strong>Distributed system</strong>: one database spread across several machines (servers) that work together.</li>
+        <li><strong>Replication</strong>: keeping copies of the same data on several machines, so nothing is lost if one fails.</li>
+        <li><strong>Sharding</strong>: splitting the data into parts (shards), each stored on a different machine, so no single machine has to hold everything.</li>
+        <li><strong>High availability</strong>: the system stays up even when some machines go down, thanks to those copies.</li>
+        <li><strong>Vertical scaling</strong>: giving one machine more power (CPU, RAM). <strong>Horizontal scaling</strong>: adding more machines.</li>
+      </ul>
+
+      <h3 id="full-text-search">Full-text search</h3>
+      <p>
+        Classic keyword search: find documents that contain the words you typed (like a search
+        box on a website), usually with smart ranking and handling of word forms. It matches
+        <em>words</em>, while vector search matches <em>meaning</em>. Some databases, Chroma
+        included, offer both.
+      </p>
+
+      <h3 id="temperature">Temperature and max_tokens</h3>
+      <p>
+        An LLM writes its answer one token at a time, each time choosing from many possible
+        next tokens. <strong>Temperature</strong> controls how adventurous that choice is: near 0
+        it almost always picks the most likely token, giving focused, repeatable answers;
+        higher values (around 1) pick less likely tokens more often, giving more varied,
+        creative text. Low values like 0.2 suit RAG, where answers should stick to the context.
+        <strong>max_tokens</strong> caps how long the answer can be; generation stops once the
+        limit is reached.
+      </p>
+
+      <h3 id="chat-messages">Chat messages: system, human, AI</h3>
+      <p>
+        Chat models take a conversation as a list of messages, each with a role. A
+        <strong>system</strong> message sets the rules ("you are an assistant for
+        question-answering…"). <strong>Human</strong> messages are what the user says.
+        <strong>AI</strong> messages are the model's replies; in LangChain,
+        <code>llm.invoke(...)</code> returns an <code>AIMessage</code>, whose
+        <code>.content</code> is the reply text.
+      </p>
+
+      <h3 id="runnables">Runnables and the pipe operator</h3>
+      <p>
+        In LangChain, almost everything (prompts, models, retrievers, output parsers) is a
+        <strong>runnable</strong>: an object with an <code>invoke</code> method that takes an
+        input and returns an output. <code>a | b</code> creates a new runnable that runs
+        <code>a</code>, then feeds its output into <code>b</code>. A plain function like
+        <code>format_docs</code> placed in a chain is wrapped automatically (as a
+        <code>RunnableLambda</code>). A dictionary at the start of a chain is turned into a
+        <code>RunnableParallel</code>: each value receives the same input and they run side by
+        side, producing a dictionary of results, which is how
+        <code>{"context": ..., "question": ...}</code> builds the prompt's inputs.
+      </p>
+
+      <h3 id="model-names">Reading model names: gemma2-9b-it</h3>
+      <p>
+        Open model names pack in a lot: <strong>gemma2</strong> is the model family and version
+        (Google's Gemma 2), <strong>9b</strong> means about 9 billion
+        <a href="#parameters">parameters</a> (bigger is usually smarter but slower), and
+        <strong>it</strong> means <em>instruction-tuned</em>: trained further to follow
+        instructions and chat, rather than just continue text. You'll see the same pattern in
+        names like <code>llama-3.1-8b-instruct</code>.
+      </p>
+
+      <h3 id="pickle">Pickle and deserialization</h3>
+      <p>
+        <strong>Pickle</strong> is Python's built-in way to save Python objects to a file
+        (<em>serialization</em>) and load them back (<em>deserialization</em>). FAISS's
+        <code>save_local</code> writes two files: <code>index.faiss</code> (the vector index) and
+        <code>index.pkl</code> (the documents and metadata, pickled). The catch: loading a
+        pickle file can run code hidden inside it, so a malicious file could do anything on your
+        machine. That's why LangChain makes you pass
+        <code>allow_dangerous_deserialization=True</code>: you're confirming the file is one you
+        trust, such as one you created yourself.
+      </p>
+
+      <h3 id="streaming">Streaming (token streaming)</h3>
+      <p>
+        An LLM generates its answer one token at a time. Normally (<code>invoke</code>) you wait
+        until the whole answer is finished and get it all at once. With
+        <strong>streaming</strong> (<code>stream</code>), each token or small group of tokens is
+        sent to you as soon as it's generated, so the text appears word by word, the way
+        ChatGPT types out its replies. The total time is about the same, but the user sees the
+        answer start almost immediately, which feels much faster in a chat app.
+      </p>
+
+      <h3 id="cassandra">Apache Cassandra</h3>
+      <p>
+        An open-source, distributed database originally built at Facebook, designed to spread
+        huge amounts of data across many servers with no single point of failure (see
+        <a href="#distributed">distributed systems</a>). DataStax builds its products, including
+        Astra DB, on top of it.
+      </p>
+
+      <h3 id="serverless">Serverless</h3>
+      <p>
+        A way of running a cloud service where you don't pick or manage any servers: the
+        provider runs and scales the machines for you, and you typically pay for what you use
+        (requests, storage) rather than for machines sitting idle. A "serverless vector
+        database" is one you just create and call; the provider handles the rest. You still
+        choose a cloud (e.g. AWS) and a <strong>region</strong> (the geographic data centre,
+        e.g. <code>us-east-1</code>), ideally close to where your app runs.
+      </p>
+
+      <h3 id="regex">Regular expressions (regex)</h3>
+      <p>
+        A mini-language for describing patterns in text, used to find, match or split on them.
+        For example, the pattern <code>(?&lt;=[.!?])\s+</code> means "the spaces right after a full
+        stop, exclamation or question mark", so <code>re.split</code> with it breaks text into
+        sentences. Python's built-in <code>re</code> module handles regular expressions.
+      </p>
+
+      <h3 id="sklearn">scikit-learn (sklearn)</h3>
+      <p>
+        The standard Python library for classic machine learning: models, data preparation and
+        evaluation tools. It also has handy helpers such as
+        <code>sklearn.metrics.pairwise.cosine_similarity</code>, which takes two lists of vectors
+        and returns a matrix of the cosine similarity between every pair.
+      </p>
+
+      <h3 id="python-classes">Python classes, __init__ and self</h3>
+      <p>
+        A <strong>class</strong> is a blueprint for objects that bundle data and functions
+        together. <code>chunker = ThresholdSemanticChunker(threshold=0.7)</code> creates one object
+        (an <em>instance</em>) from the blueprint. <code>__init__</code> is the
+        <strong>constructor</strong>: it runs once when the object is created and usually stores
+        settings. <code>self</code> is the object itself, so <code>self.threshold = threshold</code>
+        saves the value on that object, and every method can read it later. Functions defined
+        inside a class are called <strong>methods</strong> and are called on the object:
+        <code>chunker.split_documents(docs)</code>.
+      </p>
+
+      <h3 id="semanticchunker">How LangChain's SemanticChunker decides where to split</h3>
+      <p>
+        <code>SemanticChunker</code> doesn't use a fixed similarity like 0.7. By default it:
+      </p>
+      <ol>
+        <li>Splits the text into sentences with a regex that breaks after <code>.</code>, <code>?</code> or <code>!</code>.</li>
+        <li>Embeds each sentence together with its neighbours (<code>buffer_size=1</code>: one sentence on each side), which smooths out very short sentences.</li>
+        <li>Computes the cosine <em>distance</em> (1 − similarity) between each pair of neighbouring sentences.</li>
+        <li>
+          Splits wherever the distance is unusually large. With the default
+          <code>breakpoint_threshold_type="percentile"</code> and amount 95, "unusually large"
+          means larger than 95% of the distances in that document.
+        </li>
+      </ol>
+      <p>
+        So the threshold adapts to each document. Other options for
+        <code>breakpoint_threshold_type</code> are <code>"standard_deviation"</code>,
+        <code>"interquartile"</code> and <code>"gradient"</code>, and you can change the amount,
+        e.g. <code>SemanticChunker(embedding, breakpoint_threshold_type="percentile",
+        breakpoint_threshold_amount=90)</code> to split more often.
+      </p>
+
+      <h3 id="tfidf-bm25">Bag of words, TF-IDF and BM25</h3>
+      <p>Three classic ways to turn text into a sparse vector for keyword matching:</p>
+      <ul>
+        <li>
+          <strong>Bag of words</strong>: one slot per word in the vocabulary; the value is
+          whether (or how often) the word appears. Word order is ignored.
+        </li>
+        <li>
+          <strong>TF-IDF</strong> (term frequency × inverse document frequency): like bag of
+          words, but each word is weighted. <em>TF</em> rises the more often the word appears in
+          this document; <em>IDF</em> is high for words that appear in few documents and low for
+          common words like "the". So rare, specific words ("Pinecone", "BM25") count for much
+          more than everyday ones.
+        </li>
+        <li>
+          <strong>BM25</strong>: an improved TF-IDF used by most search engines. Repeating a
+          word gives diminishing returns (the 10th "LLM" adds far less than the 2nd), and long
+          documents don't win just by being long.
+        </li>
+      </ul>
+      <p>
+        One practical detail when mixing these with cosine similarity: BM25 scores aren't
+        limited to 0–1 (they can be 5, 12, …), while cosine scores are. Real hybrid systems
+        therefore normalise both scores to the same range (or combine rankings instead of raw
+        scores) before applying the α weighting.
+      </p>
+
+      <h3 id="rrf">Reciprocal Rank Fusion (RRF)</h3>
+      <p>
+        A simple way to merge ranked lists from different searches without comparing their raw
+        scores. Each document gets <code>1 / (k + rank)</code> from every list it appears in (rank
+        1 is the top result; <code>k</code> is a constant, commonly 60), and the contributions are
+        added up. Documents ranked high by several searches rise to the top. LangChain's
+        <code>EnsembleRetriever</code> uses a <em>weighted</em> version: each list's
+        contributions are multiplied by that retriever's weight (e.g. 0.7 and 0.3). Because only
+        ranks are used, it doesn't matter that BM25 scores and cosine scores are on different
+        scales.
+      </p>
+
+      <h3 id="recall">Recall, precision, hit rate and coverage</h3>
+      <p>
+        Ways to judge what a retriever returns. <strong>Recall</strong>: of all the documents that
+        are actually relevant to a question, what fraction did the search return? (Finding 3 of
+        4 relevant chunks = 75% recall.) <strong>Precision</strong>: of the documents the search
+        returned, what fraction are actually relevant? (3 relevant out of 5 returned = 60%
+        precision.) <strong>Hit rate</strong>: across many test questions, how often was at least
+        one correct document among the results? <strong>Coverage</strong> is a looser idea: do
+        the results cover the different aspects of the question, or just one aspect many times?
+      </p>
+      <p>
+        Hybrid search mainly raises recall (it misses less). Reranking helps the most relevant
+        results come first. MMR trades a little precision for more coverage.
+      </p>
+
+      <h3 id="cross-encoder">Bi-encoders vs cross-encoders</h3>
+      <p>
+        The embedding models used for retrieval are <strong>bi-encoders</strong>: they turn the
+        query and each document into vectors <em>separately</em>, so document vectors can be
+        computed once, stored, and compared very quickly. The price is that the model never
+        sees the query and the document side by side.
+      </p>
+      <p>
+        A <strong>cross-encoder</strong> takes the query and one document <em>together</em> as a
+        single input and outputs a relevance score. Because it can compare every word of the
+        question with every word of the document, it judges relevance much more accurately. But
+        nothing can be precomputed, and it must run once per (query, document) pair, which is
+        far too slow for millions of documents. Hence the two-stage design: a bi-encoder (or
+        BM25) quickly narrows millions down to the top 10–50, then a cross-encoder reranks just
+        those. Popular open-source rerankers include
+        <code>cross-encoder/ms-marco-MiniLM-L-6-v2</code> and the BGE reranker models; Cohere
+        offers one as an API.
+      </p>
+
+      <h3 id="crewai">CrewAI</h3>
+      <p>
+        An open-source Python framework for building <a href="#agentic">agentic AI</a>
+        applications as a "crew" of agents. Each agent gets a role (e.g. researcher, writer), a
+        goal and tools, and the agents work through tasks together. It's often mentioned
+        alongside LangChain and LangGraph as a way to build multi-agent systems.
+      </p>
+
+      <h3 id="multi-hop">Multi-hop reasoning</h3>
+      <p>
+        Answering a question that needs several facts chained together, where each step depends
+        on the one before. "Who founded the company that makes the iPhone, and where was that
+        person born?" needs two hops: Apple → Steve Jobs, then Steve Jobs → San Francisco. A
+        single retrieval often can't find both facts at once; breaking the question into steps
+        lets each hop get its own retrieval.
+      </p>
+
+      <h3 id="zero-shot">Zero-shot</h3>
+      <p>
+        Doing a task without any task-specific examples or training. "Zero-shot retrieval" means
+        retrieving well on a new collection of documents without first training or fine-tuning
+        a retriever on labelled examples from that collection. HyDE was designed for this: it
+        relies on a general-purpose LLM and embedding model, with no relevance labels.
+      </p>
+
+      <h3 id="clip">CLIP, Vision Transformers and shared embedding spaces</h3>
+      <p>
+        CLIP has two encoders: a <strong>text Transformer</strong> for text and a
+        <strong>Vision Transformer (ViT)</strong> for images. A ViT cuts an image into small
+        square patches (32 × 32 pixels in <code>clip-vit-base-patch32</code>, hence the name),
+        treats each patch like a word, and processes the sequence with a Transformer.
+      </p>
+      <p>
+        <strong>Contrastive</strong> training is what links the two. CLIP was shown hundreds of
+        millions of (image, caption) pairs and trained so that each image's vector is pulled
+        close to its own caption's vector and pushed away from all the other captions. After
+        training, both encoders output vectors in <strong>one shared space</strong>: the text
+        "a photo of a dog" and an actual dog photo end up near each other. That's what lets a text
+        query retrieve an image with ordinary cosine similarity.
+      </p>
+
+      <h3 id="base64">Base64 and data URLs</h3>
+      <p>
+        <strong>Base64</strong> is a way to write any binary data (like the bytes of a PNG image)
+        using only plain text characters (letters, digits, <code>+</code> and <code>/</code>).
+        It makes files about a third bigger, but they can then travel inside text formats like
+        JSON. A <strong>data URL</strong> puts that text straight into a URL:
+        <code>data:image/png;base64,iVBORw0KGgo…</code>. Multimodal LLM APIs accept images this way,
+        so no image hosting is needed.
+      </p>
+
+      <h3 id="pytorch">PyTorch and tensors</h3>
+      <p>
+        <strong>PyTorch</strong> (<code>torch</code>) is the deep learning library most Hugging
+        Face models run on. It works with <strong>tensors</strong>: multi-dimensional arrays of
+        numbers, like NumPy arrays but able to run on GPUs. <code>torch.no_grad()</code> tells
+        PyTorch you're only using the model, not training it, so it skips the bookkeeping needed
+        for training, which saves memory and time.
+      </p>
+
+      <h3 id="reinforcement-learning">Reinforcement learning</h3>
+      <p>
+        A kind of machine learning where a system learns by trial and error: it takes actions,
+        receives a reward or penalty for the outcome, and gradually favours the actions that
+        earn more reward. A smart home agent might be "rewarded" for saving electricity and
+        "penalised" when a person comes home to a cold house, and over time learn when to turn
+        the heating on.
+      </p>
+
+      <h3 id="agile">Agile, sprints and stories</h3>
+      <p>
+        <strong>Agile</strong> is a common way of running software projects in short cycles instead
+        of one long plan. Work is split into small <strong>stories</strong> (tasks, each
+        describing one piece of functionality), and the team commits to a set of them for a
+        <strong>sprint</strong>, typically one or two weeks. At the end of each sprint the work is
+        built, tested and reviewed, and the next sprint is planned from what was learned.
+        <strong>CI/CD</strong> (continuous integration / continuous deployment) automates building,
+        testing and releasing the code each time it changes.
+      </p>
+
+      <h3 id="react">ReAct (Reason + Act)</h3>
+      <p>
+        A pattern for building agents, from a 2022 research paper. The LLM alternates between
+        <strong>reasoning</strong> ("I need today's weather; I should call the weather tool"),
+        <strong>acting</strong> (calling the tool), and <strong>observing</strong> the result,
+        repeating until it can answer. Older LangChain code wired this loop up by hand;
+        <code>create_agent</code> in v1 builds the same model ⇄ tools loop for you.
+      </p>
+
+      <h3 id="docstrings">Docstrings and type hints</h3>
+      <p>
+        A <strong>docstring</strong> is the text in triple quotes right under a Python function's
+        definition, describing what it does: <code>"""Get the weather for a city."""</code>.
+        <strong>Type hints</strong> like <code>city: str</code> and <code>-&gt; str</code> state what
+        types go in and come out. LangChain turns a function's name, docstring and type hints
+        into a tool description the LLM can read, so a clear docstring directly affects how well
+        the agent picks and uses the tool.
+      </p>
+
+      <h3 id="decorators">Python decorators</h3>
+      <p>
+        A <strong>decorator</strong> is the <code>@something</code> line written just above a
+        function. It wraps the function to add behaviour without changing its code:
+        <code>@tool</code> above <code>def get_weather(...)</code> takes the function and returns a
+        LangChain tool object built from it (name, arguments, docstring, plus the function to run).
+      </p>
+
+      <h3 id="coroutine">Coroutines (async functions)</h3>
+      <p>
+        A <strong>coroutine</strong> is a function defined with <code>async def</code>. Instead of
+        blocking while it waits (for an API, a database, a file), it can pause with
+        <code>await</code> and let other work run in the meantime. LangChain tools can be either
+        normal functions or coroutines; async tools are useful when an agent calls slow external
+        services.
+      </p>
+
+      <h3 id="reasoning-models">Reasoning models</h3>
+      <p>
+        Some LLMs (Qwen3, DeepSeek-R1, OpenAI's o-series and GPT-5, among others) are trained to
+        "think" before answering: they first produce a chain of reasoning ("the user wants the
+        weather; I should call get_weather"), then the actual reply. Some APIs return that
+        reasoning separately, which is why a response can include a reasoning section alongside
+        the tool call. It usually improves decisions on multi-step tasks, at the cost of extra
+        tokens and time.
+      </p>
+
+      <h3 id="pydantic">Pydantic</h3>
+      <p>
+        A popular Python library for describing data with classes and type hints, and
+        <strong>validating</strong> it. You write <code>class Movie(BaseModel): year: int</code>; when
+        you create a <code>Movie</code>, Pydantic checks the values, converts what it safely can (the
+        string <code>"2010"</code> becomes the integer <code>2010</code>), and raises a
+        <code>ValidationError</code> for anything it can't. A Pydantic model can also be turned into a
+        JSON schema, which is how LangChain describes the expected output format to the LLM.
+        <code>float | None</code> means "a float or nothing"; giving it a default of <code>None</code>
+        makes the field optional.
+      </p>
+
+      <h3 id="pii">PII (personally identifiable information)</h3>
+      <p>
+        Any data that can identify a specific person: names, email addresses, phone numbers,
+        home addresses, ID or card numbers. AI apps often need to detect PII and mask or block it,
+        so it isn't stored in logs, sent to an external LLM provider, or repeated back to the wrong
+        user. "PII detection" middleware does this automatically.
+      </p>
+
+      <h3 id="checkpointer">Checkpointers and thread IDs</h3>
+      <p>
+        An agent forgets everything between calls unless its state is saved. A
+        <strong>checkpointer</strong> (from LangGraph) saves the conversation after each step;
+        <code>InMemorySaver</code> keeps it in RAM (lost when the program stops), while database-
+        backed checkpointers keep it permanently. Each conversation is stored under a
+        <strong>thread ID</strong> passed in <code>config={"configurable": {"thread_id": "..."}}</code>:
+        the same ID continues the same conversation, and a new ID starts a fresh one, which is how
+        one agent serves many users separately.
+      </p>
+
+      <h3 id="in-memory-db">In-memory database</h3>
+      <p>
+        A database that keeps its data in RAM instead of on disk. Very fast, but the data is lost
+        when the program stops, unless it's saved somewhere first.
+      </p>
+
+      <h3 id="encoding">Encoding (UTF-8)</h3>
+      <p>
+        Computers store text as numbers. An <strong>encoding</strong> is the rulebook for which
+        numbers mean which characters. <strong>UTF-8</strong> is the standard one today and covers
+        every language (₹, é, हिन्दी, emoji). If a file is read with the wrong encoding, special
+        characters come out garbled (like <code>Ã©</code> instead of <code>é</code>) or the read
+        fails. That's why the loaders pass <code>encoding="utf-8"</code>.
+      </p>
+
+      <h3 id="glob">Glob pattern</h3>
+      <p>A simple way to describe file names using wildcards:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pattern</th><th>Matches</th></tr></thead>
+          <tbody>
+            <tr><td><code>*.txt</code></td><td>Any <code>.txt</code> file in this folder only</td></tr>
+            <tr><td><code>**/*.txt</code></td><td>Any <code>.txt</code> file in this folder <em>and every folder inside it</em></td></tr>
+            <tr><td><code>report_*.pdf</code></td><td><code>report_2024.pdf</code>, <code>report_q1.pdf</code>, …</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <code>*</code> means "any characters", <code>**</code> means "any number of folders". The
+        course calls it a regular expression, but a glob is simpler: regular expressions are a
+        more powerful (and more complex) pattern language.
+      </p>
+
+      <h3 id="ocr">OCR (Optical Character Recognition)</h3>
+      <p>
+        Reading text out of an <em>image</em> by recognising the shapes of letters. A scanned PDF
+        page is just a picture, so a normal PDF loader finds no text on it; OCR is what turns
+        that picture back into text.
+      </p>
+
+      <h3 id="multimodal">Multimodal model</h3>
+      <p>
+        An AI model that understands more than one kind of input (text <em>and</em> images, and
+        sometimes audio or video). Google Gemini is one. For PDFs, you can give it a page image,
+        chart or table and ask it to describe or extract what's there, which goes beyond plain
+        OCR.
+      </p>
+
+      <h3 id="unstructured">Unstructured (the library)</h3>
+      <p>
+        An open-source Python library that reads many file types (Word, PDF, HTML, emails,
+        PowerPoint, …) and breaks them into typed <strong>elements</strong>: <code>Title</code>,
+        <code>NarrativeText</code>, <code>ListItem</code>, <code>Table</code>, and so on. LangChain's
+        <code>Unstructured…Loader</code> classes are wrappers around it. It's thorough but heavy,
+        which is why it's slower than simple loaders.
+      </p>
+
+      <h3 id="sentence-transformers">sentence-transformers</h3>
+      <p>
+        A Python library that runs embedding models from <a href="#hugging-face">Hugging Face</a>
+        on your own machine, for free. You give it sentences; it gives back vectors.
+      </p>
+
+      <h3 id="pypdf">pypdf</h3>
+      <p>A Python library that opens PDF files and pulls the text out of each page.</p>
+
+      <h3 id="cosine-math">Dot product, magnitude and cosine similarity</h3>
+      <p>
+        The course gives the cosine similarity formula, <code>(A · B) / (‖A‖ × ‖B‖)</code>, but
+        not the maths behind it:
+      </p>
+      <ul>
+        <li>
+          <strong>Dot product (A · B):</strong> multiply the two vectors number by number and add
+          the results. Big when both vectors are high on the same features.
+        </li>
+        <li>
+          <strong>Magnitude (‖A‖):</strong> the length of the vector: square each number, add
+          them up, take the square root.
+        </li>
+        <li>
+          <strong>Dividing by the magnitudes</strong> removes the effect of length, so what's
+          left measures only the <em>angle</em> between the two vectors, i.e. whether they point
+          in the same direction. The result runs from −1 to 1; 1 means the same direction.
+        </li>
+      </ul>
+      <p>Worked out with the movie vectors from Lesson 17 (action, comedy, suspense):</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Iron Man compared with</th><th>Dot product</th><th>Magnitudes</th><th>Cosine similarity</th></tr></thead>
+          <tbody>
+            <tr><td>Hulk <code>[0.96, 0.4, 0.7]</code></td><td>0.912 + 0.08 + 0.42 = 1.412</td><td>1.141 × 1.254</td><td><strong>≈ 0.99</strong></td></tr>
+            <tr><td>Sherlock Holmes <code>[0.6, 0.75, 0.9]</code></td><td>0.57 + 0.15 + 0.54 = 1.26</td><td>1.141 × 1.316</td><td><strong>≈ 0.84</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Iron Man is <code>[0.95, 0.2, 0.6]</code>. Hulk scores higher, so it's the closer match.
+      </p>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="index.html"><small>← Back</small><span>Chapter overview</span></a>
+        <a class="next" href="01-introduction-to-rag.html"><small>Start</small><span>Why RAG: the problem with LLMs</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

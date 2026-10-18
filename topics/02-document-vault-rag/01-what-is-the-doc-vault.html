@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What is the Document Vault</title>
+  <meta name="description" content="The two halves of the Doc Vault, what RAG means, the life of one file, and which code files matter.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html" aria-current="page">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 1</p>
+      <h1>What is the Document Vault?</h1>
+
+      <p class="lead">
+        The Document Vault lets a user upload their PDFs (bank statements, contract notes,
+        reports) and then ask questions about them in plain language: "What is my closing
+        balance?", "When was the last dividend paid?". This lesson is the map for the whole
+        chapter.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#what-user-sees">What the user sees</a></li>
+          <li><a href="#two-halves">The two halves</a></li>
+          <li><a href="#rag">What "RAG" means</a></li>
+          <li><a href="#why-not-whole">Why not just send the whole PDF to the AI?</a></li>
+          <li><a href="#statuses">The life of one file</a></li>
+          <li><a href="#files">Which files do what</a></li>
+          <li><a href="#ignore">Files you can ignore</a></li>
+        </ol>
+      </div>
+
+      <h2 id="what-user-sees">What the user sees</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Upload</span>
+          <span class="step-body">The user picks one or more PDFs on the Vault page and uploads them. The reply comes back in a second or two: "Upload complete. Files will be processed in background."</span>
+        </li>
+        <li>
+          <span class="step-title">Wait</span>
+          <span class="step-body">The file shows as <em>pending</em>, then <em>processing</em>, then <em>completed</em>. This can take a few minutes.</span>
+        </li>
+        <li>
+          <span class="step-title">Chat</span>
+          <span class="step-body">Once a file is completed, the user can ask questions. The answer comes with references: which file and which page it came from.</span>
+        </li>
+      </ol>
+
+      <h2 id="two-halves">The two halves</h2>
+      <p class="keyidea">
+        The Doc Vault does two jobs: prepare the file once (in the background), then answer
+        questions from it as many times as the user likes.
+      </p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 290" role="img" aria-label="Two-part flow: preparing a file, then answering questions">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <text x="0" y="18" class="d-text d-label-accent">Part 1: prepare the file (once, in the background)</text>
+
+            <rect x="0" y="34" width="110" height="46" rx="8" class="d-box"/>
+            <text x="55" y="62" text-anchor="middle" class="d-small">Upload</text>
+            <line x1="110" y1="57" x2="128" y2="57" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="130" y="34" width="110" height="46" rx="8" class="d-box"/>
+            <text x="185" y="55" text-anchor="middle" class="d-small">Save PDF</text>
+            <text x="185" y="70" text-anchor="middle" class="d-muted">S3 + DB row</text>
+            <line x1="240" y1="57" x2="258" y2="57" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="260" y="34" width="110" height="46" rx="8" class="d-box accent"/>
+            <text x="315" y="62" text-anchor="middle" class="d-small">Extract text</text>
+            <line x1="370" y1="57" x2="388" y2="57" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="390" y="34" width="110" height="46" rx="8" class="d-box accent"/>
+            <text x="445" y="62" text-anchor="middle" class="d-small">Chunk</text>
+            <line x1="500" y1="57" x2="518" y2="57" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="520" y="34" width="110" height="46" rx="8" class="d-box accent"/>
+            <text x="575" y="62" text-anchor="middle" class="d-small">Embed</text>
+            <line x1="630" y1="57" x2="648" y2="57" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="650" y="34" width="110" height="46" rx="8" class="d-box ok"/>
+            <text x="705" y="55" text-anchor="middle" class="d-small">Save index</text>
+            <text x="705" y="70" text-anchor="middle" class="d-muted">ChromaDB + S3</text>
+
+            <text x="120" y="104" text-anchor="middle" class="d-muted">status: pending</text>
+            <text x="445" y="104" text-anchor="middle" class="d-muted">background worker (every 5 min): processing</text>
+            <text x="705" y="104" text-anchor="middle" class="d-muted">status: completed</text>
+
+            <text x="0" y="168" class="d-text d-label-accent">Part 2: answer a question (every time the user asks)</text>
+
+            <rect x="0" y="184" width="160" height="46" rx="8" class="d-box"/>
+            <text x="80" y="212" text-anchor="middle" class="d-small">User asks a question</text>
+            <line x1="160" y1="207" x2="198" y2="207" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="200" y="184" width="160" height="46" rx="8" class="d-box accent"/>
+            <text x="280" y="212" text-anchor="middle" class="d-small">Find the best chunks</text>
+            <line x1="360" y1="207" x2="398" y2="207" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="400" y="184" width="160" height="46" rx="8" class="d-box accent"/>
+            <text x="480" y="205" text-anchor="middle" class="d-small">Ask Gemini</text>
+            <text x="480" y="220" text-anchor="middle" class="d-muted">chunks + question</text>
+            <line x1="560" y1="207" x2="598" y2="207" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="600" y="184" width="160" height="46" rx="8" class="d-box ok"/>
+            <text x="680" y="205" text-anchor="middle" class="d-small">Answer</text>
+            <text x="680" y="220" text-anchor="middle" class="d-muted">+ file and page</text>
+
+            <text x="380" y="270" text-anchor="middle" class="d-muted">Part 2 only works on files that Part 1 has marked "completed".</text>
+          </svg>
+        </div>
+        <figcaption>Part 1 does the heavy work once, so that every chat in Part 2 is fast.</figcaption>
+      </figure>
+
+      <div class="split">
+        <div>
+          <h4>Part 1: prepare the file</h4>
+          <ol>
+            <li>The user uploads a PDF. It's saved to S3, and a database row is created with status <strong>pending</strong>.</li>
+            <li>A background worker picks it up (within 5 minutes).</li>
+            <li>It extracts the text, page by page.</li>
+            <li>It cuts the text into small pieces (<strong>chunking</strong>).</li>
+            <li>It turns each piece into numbers that capture its meaning (<strong>embedding</strong>) and saves them in a small database (<strong>ChromaDB</strong>), backed up to S3.</li>
+            <li>The file is marked <strong>completed</strong>.</li>
+          </ol>
+        </div>
+        <div>
+          <h4>Part 2: answer questions</h4>
+          <ol>
+            <li>The user asks a question about their files.</li>
+            <li>The system finds the pieces of the files most related to the question.</li>
+            <li>It sends those pieces plus the question to Gemini (Google's AI).</li>
+            <li>Gemini answers using only that information.</li>
+            <li>The user sees the answer, with the file name and page it came from.</li>
+          </ol>
+        </div>
+      </div>
+
+      <h2 id="rag">What "RAG" means</h2>
+      <p>
+        <strong>RAG = Retrieval-Augmented Generation.</strong> Split into its three words:
+      </p>
+      <ul>
+        <li><strong>Retrieval:</strong> find the relevant pieces of the user's documents.</li>
+        <li><strong>Augmented:</strong> add those pieces to the question.</li>
+        <li><strong>Generation:</strong> the AI writes the answer from them.</li>
+      </ul>
+      <div class="analogy">
+        <p>
+          An open-book exam. The AI doesn't need to have memorised your bank statement. Before
+          each question, someone finds the right page in your book and puts it in front of the
+          AI. The AI just reads that page and answers.
+        </p>
+      </div>
+
+      <h2 id="why-not-whole">Why not just send the whole PDF to the AI?</h2>
+      <p>For one small PDF, you could. It stops working well as soon as documents get bigger or more numerous:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Problem</th><th>Why RAG helps</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Size limits</strong></td><td>AI models can only read so much text at once. A user with 20 long statements would go over the limit. RAG sends only a few small pieces.</td></tr>
+            <tr><td><strong>Cost</strong></td><td>You pay per amount of text sent. Sending 5 small pieces is far cheaper than sending 20 whole PDFs on every question.</td></tr>
+            <tr><td><strong>Speed</strong></td><td>Less text in, faster answer out.</td></tr>
+            <tr><td><strong>Accuracy</strong></td><td>With a mountain of text, the AI is more likely to miss or mix up details. With only the relevant pieces, it stays focused.</td></tr>
+            <tr><td><strong>References</strong></td><td>Each piece carries its file name and page number, so the answer can say where it came from.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="statuses">The life of one file</h2>
+      <p>Every uploaded file is one row in the <code>vaultFiles</code> database table. Its <code>status</code> column moves like this:</p>
+      <pre><code>pending  ──►  processing  ──►  completed     (ready for chat)
+                         └──►  error         (reason saved in errorMessage)</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Status</th><th>Set by</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>pending</code></td><td>The upload route</td><td>Saved to S3, waiting for the worker</td></tr>
+            <tr><td><code>processing</code></td><td>The worker, when it starts on the file</td><td>Being extracted and indexed right now</td></tr>
+            <tr><td><code>completed</code></td><td>The worker, at the end</td><td>Searchable. Chat is allowed</td></tr>
+            <tr><td><code>error</code></td><td>The worker, if anything failed</td><td>Not searchable. The reason is in <code>errorMessage</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Chat refuses any file that isn't <code>completed</code>.</p>
+
+      <h2 id="files">Which files do what</h2>
+      <p>All of this lives in the <code>pythoncode</code> repo.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Part</th><th>Job</th></tr></thead>
+          <tbody>
+            <tr><td><code>routes/vaultRoutes.py</code></td><td>Both</td><td>All the Vault API endpoints: upload, list, status, delete, chat, plus 2 internal ones for the worker</td></tr>
+            <tr><td><code>processVaultFiles.py</code></td><td>Part 1</td><td>The background worker. A manager that runs the steps in order</td></tr>
+            <tr><td><code>services/documentOcr.py</code></td><td>Part 1</td><td>Text extraction (<code>extractPdfPageWise</code>)</td></tr>
+            <tr><td><code>rag/indexer.py</code></td><td>Part 1</td><td>⭐ Chunking, embedding, saving to ChromaDB</td></tr>
+            <tr><td><code>rag/s3Storage.py</code></td><td>Both</td><td>Uploads and downloads index folders to and from S3</td></tr>
+            <tr><td><code>services/docVaultLlm.py</code></td><td>Part 2</td><td>Glue between the chat route and the RAG engine</td></tr>
+            <tr><td><code>rag/ragEngine.py</code></td><td>Part 2</td><td>⭐ Search, rerank, ask Gemini</td></tr>
+            <tr><td><code>core/metaFiles.py</code></td><td>Both</td><td>The SQL queries for the <code>vaultFiles</code> table</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The two most important files are <code>rag/indexer.py</code> (turns a document into something searchable) and <code>rag/ragEngine.py</code> (searches it and generates the answer).</p>
+
+      <h2 id="ignore">Files you can ignore</h2>
+      <div class="callout warn">
+        <span class="callout-title">Watch out: old code that looks important</span>
+        <p>
+          The <code>rag/</code> folder contains five files from an older version of the pipeline
+          (February 2026). The pipeline was rebuilt in June 2026, and nothing calls these anymore.
+          They have convincing names, so they're easy to study by mistake.
+        </p>
+        <ul>
+          <li><code>rag/chunker.py</code>: old chunking. The real chunking is inside <code>rag/indexer.py</code>.</li>
+          <li><code>rag/embedder.py</code>: old embedding. <code>indexer.py</code> loads the model itself.</li>
+          <li><code>rag/vectorStore.py</code> and <code>rag/retriever.py</code>: old search.</li>
+          <li><code>rag/textractOcr.py</code>: old AWS Textract extraction.</li>
+        </ul>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="index.html"><small>← Previous</small><span>Chapter overview</span></a>
+        <a class="next" href="02-how-the-backend-is-organized.html"><small>Next →</small><span>How the backend is organized</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

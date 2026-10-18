@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChromaDB RAG, Part 2</title>
+  <meta name="description" content="Storing chunks in a persistent Chroma vector store with Chroma.from_documents, retrieving relevant chunks with similarity_search, and reading the L2 distance scores from similarity_search_with_score.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html" aria-current="page">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 5 · Lesson 24</p>
+      <h1>RAG with ChromaDB, Part 2: Store and Search</h1>
+
+      <p class="lead">
+        The 5 chunks from Part 1 are embedded and stored in Chroma, then searched for the chunks
+        most relevant to a question.
+      </p>
+
+      <h2 id="create">Creating the vector store</h2>
+      <pre><code># Create the vector store
+persist_directory = "./chroma_db"
+
+# Initialize ChromaDB with OpenAI embeddings
+vectorstore = Chroma.from_documents(
+    documents=chunks,
+    embedding=embeddings,
+    persist_directory=persist_directory,
+    collection_name="rag_collection",
+)
+
+print(f"Vector store created with {vectorstore._collection.count()} vectors")
+print(f"Persisted to: {persist_directory}")</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parameter</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>documents</code></td><td>The chunks to store.</td></tr>
+            <tr><td><code>embedding</code></td><td>The model that turns each chunk into a vector.</td></tr>
+            <tr><td><code>persist_directory</code></td><td>The folder where Chroma saves everything, so it survives restarts.</td></tr>
+            <tr><td><code>collection_name</code></td><td>A name for this set of vectors (like a table name).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <code>from_documents</code> embeds every chunk and stores the vector together with its text
+        and metadata: "Vector store created with 5 vectors". A <code>chroma_db</code> folder
+        appears holding Chroma's database files.
+      </p>
+
+      <h2 id="search">Similarity search</h2>
+      <p>A vector store has search built in, so there's no need for the hand-written function of <a href="21-similarity-and-semantic-search.html">Lesson 21</a>:</p>
+      <pre><code>query = "What are the types of machine learning?"
+
+similar_docs = vectorstore.similarity_search(query, k=3)
+
+print(f"Query: {query}")
+print(f"Top {len(similar_docs)} similar chunks:")
+for i, doc in enumerate(similar_docs):
+    print(f"\n--- Chunk {i + 1} ---")
+    print(doc.page_content)
+    print(f"Metadata: {doc.metadata}")</code></pre>
+      <p><code>k=3</code> returns the 3 closest chunks, each a Document with its text and metadata.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Query</th><th>1st result</th><th>2nd result</th></tr></thead>
+          <tbody>
+            <tr><td>What are the types of machine learning?</td><td>Machine Learning Fundamentals</td><td>Deep Learning and Neural Networks</td></tr>
+            <tr><td>What is NLP?</td><td>Natural Language Processing</td><td>Deep learning (RNNs, transformers)</td></tr>
+            <tr><td>What is deep learning?</td><td>Deep Learning and Neural Networks</td><td>Machine Learning Fundamentals</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 190" role="img" aria-label="The query text is embedded automatically, compared with the stored vectors in the rag_collection inside chroma_db, and the top k matching chunks come back as text with metadata.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <rect x="0" y="66" width="140" height="58" rx="8" class="d-box"/>
+            <text x="70" y="91" text-anchor="middle" class="d-small">query text</text>
+            <text x="70" y="109" text-anchor="middle" class="d-muted">"What is NLP?"</text>
+            <line x1="140" y1="95" x2="198" y2="95" class="d-line" marker-end="url(#ah1)"/>
+            <text x="169" y="85" text-anchor="middle" class="d-muted">embed</text>
+
+            <rect x="200" y="18" width="330" height="154" rx="10" class="d-box accent"/>
+            <text x="365" y="42" text-anchor="middle" class="d-small">Chroma vector store</text>
+            <text x="365" y="60" text-anchor="middle" class="d-muted d-mono">./chroma_db · rag_collection</text>
+            <rect x="222" y="76" width="286" height="26" rx="5" class="d-box"/>
+            <text x="365" y="94" text-anchor="middle" class="d-muted d-mono">vector · chunk text · metadata</text>
+            <rect x="222" y="106" width="286" height="26" rx="5" class="d-box"/>
+            <text x="365" y="124" text-anchor="middle" class="d-muted d-mono">vector · chunk text · metadata</text>
+            <text x="365" y="156" text-anchor="middle" class="d-muted">… 5 entries, compared with the query vector</text>
+
+            <line x1="530" y1="95" x2="588" y2="95" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="590" y="66" width="170" height="58" rx="8" class="d-box ok"/>
+            <text x="675" y="91" text-anchor="middle" class="d-small">top k chunks</text>
+            <text x="675" y="109" text-anchor="middle" class="d-muted">as text + metadata</text>
+          </svg>
+        </div>
+        <figcaption>Text in, text out: the store handles the embedding and comparison itself.</figcaption>
+      </figure>
+      <p class="keyidea">You give the store text and get text back: it embeds the query with the same model it used for the chunks, compares, and returns the matching chunks.</p>
+
+      <h2 id="scores">Scores: lower is better here</h2>
+      <pre><code>results_scores = vectorstore.similarity_search_with_score(query, k=3)
+
+for doc, score in results_scores:
+    print(f"Score: {score:.3f}")
+    print(doc.page_content[:100])</code></pre>
+      <p>
+        For "What is deep learning?" the best chunk scores about <strong>0.23</strong> and the third
+        about <strong>0.397</strong>. The best match has the <em>lowest</em> score because Chroma's
+        default score is <a href="background-concepts.html#euclidean" title="Background concepts">L2 (Euclidean) distance</a>: how far apart two vectors are
+        (0 = identical, typically up to about 2).
+      </p>
+      <div class="callout warn">
+        <span class="callout-title">Distance vs similarity</span>
+        <p>A distance (Chroma) is <strong>lower = more similar</strong>; cosine similarity (Lessons 18–21) is <strong>higher = more similar</strong>. Always check which one a store returns.</p>
+      </div>
+      <p>
+        Other methods: <code>similarity_search_by_vector</code> (search with a vector instead of
+        text), <code>…_with_relevance_scores</code>, and image search. The two above cover most needs.
+      </p>
+      <p>These chunks are only the store's output, not an answer yet. Part 3 hands them to an LLM.</p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong><code>Chroma.from_documents(...)</code></strong> embeds and saves all chunks in one call.</li>
+        <li><strong><code>similarity_search(query, k)</code></strong> returns the top k chunks as Documents.</li>
+        <li><strong>Chroma's scores are distances</strong>: lower = more similar.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="23-chromadb-rag-part-1.html"><small>← Previous</small><span>RAG with ChromaDB, part 1: load, split, embed</span></a>
+        <a class="next" href="25-chromadb-rag-part-3.html"><small>Next →</small><span>RAG with ChromaDB, part 3: the LLM and the retrieval chain</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

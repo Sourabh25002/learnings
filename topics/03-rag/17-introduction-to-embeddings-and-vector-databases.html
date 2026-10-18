@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Embeddings and Vector Databases</title>
+  <meta name="description" content="What embeddings are, why a vector database finds similar meanings where a traditional database only finds exact matches, feature representation, and cosine similarity.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html" aria-current="page">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 4 · Lesson 17</p>
+      <h1>Embeddings and Vector Databases</h1>
+
+      <p class="lead">
+        The next step after chunking: turn each chunk into a vector with an
+        <strong>embedding model</strong> and store it in a <strong>vector database</strong>. This
+        lesson explains what an embedding is, and why searching embeddings finds <em>meaning</em>
+        rather than exact words.
+      </p>
+
+      <h2 id="traditional">Traditional databases: exact match</h2>
+      <p>A database holds <code>cat</code>, <code>dog</code>, <code>kitten</code>, <code>puppy</code>. Search for <code>cat</code> and a traditional (SQL or NoSQL) database returns only <code>cat</code>: it looks for an <strong>exact match</strong>.</p>
+      <pre><code>SELECT * FROM employee WHERE name = 'Krish';</code></pre>
+      <p>Only the record whose name equals <code>'Krish'</code> comes back. However complex the query, the match is exact.</p>
+
+      <h2 id="embeddings">What an embedding is</h2>
+      <p class="keyidea">An <strong>embedding</strong> turns text into a <strong>vector</strong>: a list of numbers that represents its meaning. Models can't work with words directly, only with numbers.</p>
+      <p>
+        "Apple" might become <code>[0.2, 0.7, 0.1, …]</code>. The vector database stores each vector
+        as a record with an ID, so you know which text it came from. (Embeddings are an
+        <a href="background-concepts.html#nlp" title="Background concepts">NLP</a> idea; the course assumes the basics.)
+      </p>
+
+      <h2 id="vector-db">Vector databases: similar meaning</h2>
+      <p>Store the same four words as vectors and search for <code>cat</code> again: now you get <code>cat</code> <em>and</em> <code>kitten</code>.</p>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 190" role="img" aria-label="Searching for cat: the traditional database returns only cat; the vector database returns cat and kitten.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <rect x="0" y="15" width="130" height="56" rx="8" class="d-box"/>
+            <text x="65" y="48" text-anchor="middle" class="d-small">search "cat"</text>
+            <line x1="130" y1="43" x2="218" y2="43" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="220" y="15" width="260" height="56" rx="8" class="d-box"/>
+            <text x="350" y="38" text-anchor="middle" class="d-small">Traditional database</text>
+            <text x="350" y="57" text-anchor="middle" class="d-muted">exact match</text>
+            <line x1="480" y1="43" x2="568" y2="43" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="570" y="15" width="190" height="56" rx="8" class="d-box ok"/>
+            <text x="665" y="48" text-anchor="middle" class="d-small d-mono">cat</text>
+
+            <rect x="0" y="115" width="130" height="56" rx="8" class="d-box"/>
+            <text x="65" y="148" text-anchor="middle" class="d-small">search "cat"</text>
+            <line x1="130" y1="143" x2="218" y2="143" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="220" y="115" width="260" height="56" rx="8" class="d-box accent"/>
+            <text x="350" y="138" text-anchor="middle" class="d-small">Vector database</text>
+            <text x="350" y="157" text-anchor="middle" class="d-muted">similar meaning</text>
+            <line x1="480" y1="143" x2="568" y2="143" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="570" y="115" width="190" height="56" rx="8" class="d-box ok"/>
+            <text x="665" y="148" text-anchor="middle" class="d-small d-mono">cat, kitten</text>
+          </svg>
+        </div>
+        <figcaption>Same data (cat, dog, kitten, puppy), same search, different results.</figcaption>
+      </figure>
+      <p>
+        Embedding models are <a href="background-concepts.html#deep-learning" title="Background concepts">deep learning</a> models trained on huge amounts of
+        text, so that <strong>similar meanings get similar vectors</strong>:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Word</th><th>Vector (example)</th></tr></thead>
+          <tbody>
+            <tr><td><code>cat</code></td><td><code>[0.2, 0.3, 0.4]</code></td></tr>
+            <tr><td><code>kitten</code></td><td><code>[0.2, 0.4, 0.3]</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The vectors are close, so the vector database, which returns whatever is closest to the query's vector, finds kitten too.</p>
+
+      <h2 id="features">What the numbers mean</h2>
+      <p>
+        Each number can be read as a <strong>feature</strong>: how strongly the text relates to some
+        property. With three made-up features:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Movie</th><th>Action</th><th>Comedy</th><th>Suspense</th></tr></thead>
+          <tbody>
+            <tr><td>Iron Man</td><td>0.95</td><td>0.2</td><td>0.6</td></tr>
+            <tr><td>Hulk</td><td>0.96</td><td>0.4</td><td>0.7</td></tr>
+            <tr><td>Sherlock Holmes</td><td>0.6</td><td>0.75</td><td>0.9</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Iron Man is the vector <code>[0.95, 0.2, 0.6]</code>. (Real models don't use named features like "action"; this is only to show the idea.)</p>
+
+      <h2 id="cosine">Measuring closeness: cosine similarity</h2>
+      <div class="analogy">
+        <p>You just watched Iron Man on Netflix. Should it recommend Hulk or Sherlock Holmes next?</p>
+      </div>
+      <pre><code>cosine similarity = (A · B) / (‖A‖ × ‖B‖)</code></pre>
+      <p>
+        <strong>Cosine similarity</strong> compares the <em>direction</em> of two vectors: the
+        <a href="background-concepts.html#cosine-math" title="Background concepts">dot product</a> divided by the product of their lengths. The higher the
+        result, the more similar.
+      </p>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 640 330" role="img" aria-label="Plot of action against comedy. Iron Man at 0.95, 0.2 and Hulk at 0.96, 0.4 sit close together; Sherlock Holmes at 0.6, 0.75 is far from both.">
+            <defs>
+              <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <!-- axes: 260px per unit, origin (60,290) -->
+            <line x1="60" y1="290" x2="350" y2="290" class="d-line" marker-end="url(#ah2)"/>
+            <line x1="60" y1="290" x2="60" y2="16" class="d-line" marker-end="url(#ah2)"/>
+            <text x="350" y="316" text-anchor="end" class="d-muted">action →</text>
+            <text x="70" y="22" class="d-muted">comedy</text>
+            <text x="50" y="304" text-anchor="end" class="d-muted d-mono">0</text>
+            <line x1="190" y1="286" x2="190" y2="294" class="d-line"/>
+            <text x="190" y="308" text-anchor="middle" class="d-muted d-mono">0.5</text>
+            <line x1="320" y1="286" x2="320" y2="294" class="d-line"/>
+            <text x="320" y="308" text-anchor="middle" class="d-muted d-mono">1</text>
+            <line x1="56" y1="160" x2="64" y2="160" class="d-line"/>
+            <text x="50" y="164" text-anchor="end" class="d-muted d-mono">0.5</text>
+            <line x1="56" y1="30" x2="64" y2="30" class="d-line"/>
+            <text x="50" y="34" text-anchor="end" class="d-muted d-mono">1</text>
+
+            <!-- vectors from origin -->
+            <line x1="60" y1="290" x2="307" y2="238" class="d-line accent d-dash"/>
+            <line x1="60" y1="290" x2="310" y2="186" class="d-line accent d-dash"/>
+            <line x1="60" y1="290" x2="216" y2="95" class="d-line d-dash"/>
+
+            <circle cx="307" cy="238" r="7" class="d-box accent"/>
+            <text x="320" y="248" class="d-small">Iron Man</text>
+            <circle cx="310" cy="186" r="7" class="d-box accent"/>
+            <text x="322" y="190" class="d-small">Hulk</text>
+            <circle cx="216" cy="95" r="7" class="d-box"/>
+            <text x="230" y="92" class="d-small">Sherlock Holmes</text>
+
+            <text x="420" y="196" class="d-text d-label-ok">Iron Man and Hulk: close</text>
+            <text x="420" y="216" class="d-muted">→ recommend Hulk next</text>
+            <text x="420" y="110" class="d-text">Sherlock Holmes: far away</text>
+            <text x="420" y="130" class="d-muted">→ a different kind of movie</text>
+          </svg>
+        </div>
+        <figcaption>Two of the three features plotted. Similar movies land near each other.</figcaption>
+      </figure>
+      <p>Iron Man and Hulk sit almost on top of each other; Sherlock Holmes is far away. Netflix recommends <strong>Hulk</strong>.</p>
+      <p class="keyidea">Similar-meaning search = find the vectors closest to the query's vector.</p>
+      <p>The vectors come from embedding models: paid ones from OpenAI or open-source ones from <a href="background-concepts.html#hugging-face" title="Background concepts">Hugging Face</a>.</p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>Traditional databases match exactly</strong>; vector databases match meaning.</li>
+        <li><strong>An embedding</strong> is a vector representing text; similar meanings get similar vectors.</li>
+        <li><strong>Cosine similarity</strong> measures how close two vectors are; the closest are the best matches.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="16-loading-sql-databases.html"><small>← Previous</small><span>Loading SQL databases</span></a>
+        <a class="next" href="18-visualizing-embeddings-and-cosine-similarity.html"><small>Next →</small><span>Visualizing embeddings and cosine similarity</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data Ingestion and Preprocessing</title>
+  <meta name="description" content="The first core component of a RAG pipeline: loading data from sources, splitting into chunks, embedding, and storing vectors.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html" aria-current="page">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 2 · Lesson 5</p>
+      <h1>Data Ingestion and Preprocessing</h1>
+
+      <p class="lead">
+        A RAG pipeline has three core components: <strong>document ingestion</strong>,
+        <strong>query processing</strong> and <strong>generation</strong>. This lesson is the first:
+        getting your data into the vector database. It happens in advance, before anyone asks a
+        question.
+      </p>
+
+      <h2 id="sources">What goes in</h2>
+      <p>
+        Whatever the RAG system should know about (company data, policy documents, any external
+        data), from any source: PDFs, Word documents, CSV files, websites, images, databases.
+      </p>
+      <p class="keyidea">Document ingestion: reading data from all these sources through a <strong>data ingestion pipeline</strong>, preprocessing it, and storing it in a vector database.</p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 210" role="img" aria-label="Ingestion pipeline: data sources, splitter, chunks, embedding model, vectors, vector database. Then an input query does a similarity search on the vector database.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <text x="0" y="18" class="d-text d-label-accent">Document ingestion and preprocessing</text>
+
+            <rect x="0" y="34" width="110" height="56" rx="8" class="d-box"/>
+            <text x="55" y="59" text-anchor="middle" class="d-small">Data sources</text>
+            <text x="55" y="76" text-anchor="middle" class="d-muted">PDF, CSV, web…</text>
+            <line x1="110" y1="62" x2="128" y2="62" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="130" y="34" width="110" height="56" rx="8" class="d-box accent"/>
+            <text x="185" y="59" text-anchor="middle" class="d-small">Splitter</text>
+            <text x="185" y="76" text-anchor="middle" class="d-muted">text / document</text>
+            <line x1="240" y1="62" x2="258" y2="62" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="260" y="34" width="110" height="56" rx="8" class="d-box"/>
+            <text x="315" y="59" text-anchor="middle" class="d-small">Chunks</text>
+            <text x="315" y="76" text-anchor="middle" class="d-muted">smaller parts</text>
+            <line x1="370" y1="62" x2="388" y2="62" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="390" y="34" width="110" height="56" rx="8" class="d-box accent"/>
+            <text x="445" y="59" text-anchor="middle" class="d-small">Embedding</text>
+            <text x="445" y="76" text-anchor="middle" class="d-muted">model</text>
+            <line x1="500" y1="62" x2="518" y2="62" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="520" y="34" width="110" height="56" rx="8" class="d-box"/>
+            <text x="575" y="59" text-anchor="middle" class="d-small">Vectors</text>
+            <text x="575" y="76" text-anchor="middle" class="d-muted">[0.6, 0.5, …]</text>
+            <line x1="630" y1="62" x2="648" y2="62" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="650" y="34" width="110" height="56" rx="8" class="d-box ok"/>
+            <text x="705" y="59" text-anchor="middle" class="d-small">Vector DB</text>
+            <text x="705" y="76" text-anchor="middle" class="d-muted">FAISS, Chroma…</text>
+
+            <text x="0" y="138" class="d-text d-label-ok">Then, when a query comes in</text>
+
+            <rect x="390" y="150" width="240" height="46" rx="8" class="d-box"/>
+            <text x="510" y="171" text-anchor="middle" class="d-small">Input query</text>
+            <text x="510" y="186" text-anchor="middle" class="d-muted">"What is LLM?"</text>
+            <line x1="630" y1="173" x2="680" y2="173" class="d-line"/>
+            <line x1="680" y1="173" x2="705" y2="92" class="d-line ok" marker-end="url(#ah1)"/>
+            <text x="200" y="171" text-anchor="middle" class="d-muted">similarity search (cosine,</text>
+            <text x="200" y="186" text-anchor="middle" class="d-muted">Euclidean) finds matching chunks</text>
+          </svg>
+        </div>
+        <figcaption>Ingestion fills the vector database once; queries then search it.</figcaption>
+      </figure>
+
+      <ol class="steps">
+        <li><span class="step-title">Load</span><span class="step-body">Read the data from its source.</span></li>
+        <li><span class="step-title">Split</span><span class="step-body">Cut it into chunks.</span></li>
+        <li><span class="step-title">Embed</span><span class="step-body">Turn each chunk into a vector.</span></li>
+        <li><span class="step-title">Store</span><span class="step-body">Save the vectors in a vector database.</span></li>
+      </ol>
+
+      <h2 id="chunking">Split into chunks</h2>
+      <p>A <strong>chunk</strong> is a small piece of a document. The data is cut into chunk 1, chunk 2, chunk 3…:</p>
+      <pre><code>Document  →  [ chunk 1 ] [ chunk 2 ] [ chunk 3 ] …</code></pre>
+      <p>The cutting is done by a <strong>text splitter</strong> (also called a document splitter); Section 3 shows how.</p>
+
+      <h2 id="why-chunk">Why chunk?</h2>
+      <p>
+        Every LLM has a limit on its <strong>context size</strong>: how much text it can take in at
+        once and still answer well. The limit differs between models.
+      </p>
+      <div class="analogy">
+        <p>
+          "Here's a 1,000-page book: use it to answer my question." Some LLMs can take that in;
+          others manage only about 500 pages. Chunking means only the few relevant pieces are
+          sent, not the whole book.
+        </p>
+      </div>
+      <p>
+        It also makes retrieval sharper: a small, focused chunk matches a specific question far
+        better than a whole document does. But there's a trade-off: chunks that are too small lose
+        the surrounding context, and chunks that are too large mix several topics together.
+        Choosing the size is one of the main decisions in RAG (Lesson 10).
+      </p>
+
+      <h2 id="embedding">Turn chunks into vectors</h2>
+      <p>A <strong>vector</strong> is a list of numbers that represents the meaning of a piece of text:</p>
+      <pre><code>"some sentence from the chunk"  →  [0.6, 0.5, 0.4, 0.1, 0.7, …]</code></pre>
+      <p>
+        An <strong>embedding model</strong> does the conversion: a model trained so that texts with
+        similar meanings get similar numbers (an idea from <a href="background-concepts.html#nlp" title="Background concepts">NLP</a>). The course uses
+        models from OpenAI and <a href="background-concepts.html#hugging-face" title="Background concepts">Hugging Face</a>.
+      </p>
+
+      <h2 id="store">Store the vectors</h2>
+      <p>
+        A <strong>vector database</strong> stores the vectors and can quickly find the ones closest
+        to a given vector. The course uses FAISS, ChromaDB, DataStax and Pinecone (one of the most
+        common) (<a href="background-concepts.html#vector-dbs" title="Background concepts">what each is</a>).
+      </p>
+
+      <h2 id="search">What this makes possible</h2>
+      <p>
+        With everything stored as vectors, a question can be matched against them using
+        <strong>similarity search</strong>, measured with <strong>cosine similarity</strong> or
+        <strong>Euclidean distance</strong> (two ways of measuring how close two vectors are).
+      </p>
+      <div class="analogy">
+        <p>A PDF about LLMs has been ingested. You ask "What is LLM?", and cosine similarity finds the chunks of that PDF that match.</p>
+      </div>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>Ingestion = load → split → embed → store</strong>, done in advance.</li>
+        <li><strong>Chunks</strong> fit the LLM's context limit and make retrieval precise; their size is a trade-off.</li>
+        <li><strong>Embeddings</strong> turn meaning into numbers; the vector database finds the closest ones.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html"><small>← Previous</small><span>Prompt engineering vs fine-tuning vs RAG</span></a>
+        <a class="next" href="06-query-processing-and-generation.html"><small>Next →</small><span>Query processing and generation</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

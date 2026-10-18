@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LangChain v1: Create Agent</title>
+  <meta name="description" content="What changed in LangChain v1, what makes an LLM app an agent, and building one with create_agent: a model, a tool written as a Python function, a system prompt, and invoking it with messages.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html" aria-current="page">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 11 · Lesson 55</p>
+      <h1>LangChain v1: Creating Agents</h1>
+
+      <p class="lead">
+        LangChain v1 (version 1.1.0 here) reworked agents, model integrations, tools, structured
+        output, messages, memory, streaming, and added <strong>middleware</strong> and guardrails.
+        This section covers them, starting with agents.
+      </p>
+
+      <h2 id="agent">What makes an app an agent</h2>
+      <p>
+        A plain generative AI app is input → LLM → output, limited to what the LLM learned before
+        its <strong>training cut-off</strong>. Ask "What's today's AI news?" and an
+        <strong>agent</strong> recognises it can't know, calls a <strong>tool</strong> (a web search
+        API, a database…), and answers from the tool's result.
+      </p>
+      <p class="keyidea">An agent is an LLM that decides by itself when to use a tool, and answers from what the tool returns. (A retriever over a vector store can be such a tool; that's agentic RAG.)</p>
+      <p>This used to be wired up by hand (<a href="background-concepts.html#react" title="Background concepts">ReAct</a>); v1's <code>create_agent</code> does it in one call.</p>
+
+      <h2 id="create">create_agent</h2>
+      <pre><code>import os
+from dotenv import load_dotenv
+load_dotenv()
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model="gpt-5",
+    tools=[],
+    system_prompt="You are a helpful assistant",
+)
+agent</code></pre>
+      <p>A model (GPT-5), tools (none yet) and a system prompt. Its graph is just start → model → end. (<code>verbose=True</code> isn't supported.)</p>
+
+      <h2 id="tool">Adding a tool</h2>
+      <pre><code>def get_weather(city: str) -> str:
+    """Get the weather for a city."""
+    return f"The weather in {city} is sunny"
+
+agent = create_agent(
+    model="gpt-5",
+    tools=[get_weather],
+    system_prompt="You are a helpful assistant",
+)</code></pre>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 200" role="img" aria-label="Without tools, the agent graph is start, model, end. With tools, the model can call the tools node, receive the result, and go back to the model before reaching end.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <text x="0" y="18" class="d-text d-label-accent">tools=[]</text>
+            <rect x="0" y="80" width="70" height="40" rx="20" class="d-box"/>
+            <text x="35" y="105" text-anchor="middle" class="d-small">start</text>
+            <line x1="70" y1="100" x2="108" y2="100" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="110" y="76" width="90" height="48" rx="8" class="d-box accent"/>
+            <text x="155" y="105" text-anchor="middle" class="d-small">model</text>
+            <line x1="200" y1="100" x2="238" y2="100" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="240" y="80" width="70" height="40" rx="20" class="d-box"/>
+            <text x="275" y="105" text-anchor="middle" class="d-small">end</text>
+
+            <text x="420" y="18" class="d-text d-label-ok">tools=[get_weather]</text>
+            <rect x="420" y="80" width="70" height="40" rx="20" class="d-box"/>
+            <text x="455" y="105" text-anchor="middle" class="d-small">start</text>
+            <line x1="490" y1="100" x2="528" y2="100" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="530" y="76" width="90" height="48" rx="8" class="d-box accent"/>
+            <text x="575" y="105" text-anchor="middle" class="d-small">model</text>
+            <line x1="620" y1="100" x2="658" y2="100" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="660" y="80" width="70" height="40" rx="20" class="d-box"/>
+            <text x="695" y="105" text-anchor="middle" class="d-small">end</text>
+            <rect x="530" y="150" width="90" height="40" rx="8" class="d-box ok"/>
+            <text x="575" y="175" text-anchor="middle" class="d-small">tools</text>
+            <line x1="560" y1="124" x2="560" y2="148" class="d-line" marker-end="url(#ah1)"/>
+            <line x1="590" y1="148" x2="590" y2="126" class="d-line" marker-end="url(#ah1)"/>
+          </svg>
+        </div>
+        <figcaption>With a tool, the model can go to the tools and back before answering.</figcaption>
+      </figure>
+      <p>The model can now loop through the tools before answering. The LLM chooses tools from their name, parameters and <a href="background-concepts.html#docstrings" title="Background concepts">docstring</a> ("Get the weather for a city"), so write that clearly.</p>
+
+      <h2 id="invoke">Running it</h2>
+      <pre><code>response = agent.invoke({
+    "messages": [{"role": "user", "content": "What is the weather like in New York?"}]
+})</code></pre>
+      <p>The input must be a dictionary with a <code>"messages"</code> list. The response's messages show the agent's steps:</p>
+      <ol class="steps">
+        <li><span class="step-title">Human</span><span class="step-body">"What is the weather like in New York?"</span></li>
+        <li><span class="step-title">AI: tool call</span><span class="step-body"><code>get_weather(city="New York")</code></span></li>
+        <li><span class="step-title">Tool</span><span class="step-body">"The weather in New York is sunny"</span></li>
+        <li><span class="step-title">AI: answer</span><span class="step-body">"It's sunny in New York."</span></li>
+      </ol>
+      <pre><code>print(response["messages"][-1].content)     # just the final answer
+
+# Shorter: a plain string as the messages value is treated as the user's message
+agent.invoke({"messages": "What is the weather in New York?"})</code></pre>
+      <pre><code>import langchain
+print(langchain.__version__)    # 1.1.0</code></pre>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>Agent</strong> = LLM + tools it decides to use.</li>
+        <li><strong><code>create_agent(model, tools, system_prompt)</code></strong>; invoke with <code>{"messages": [...]}</code>; the last message is the answer.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="54-agentic-ai-software-team-example.html"><small>← Previous</small><span>Agentic AI example: a software team</span></a>
+        <a class="next" href="56-invoke-stream-batch.html"><small>Next →</small><span>Invoke, stream and batch</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vector Stores vs Databases</title>
+  <meta name="description" content="The difference between a vector store (a lightweight in-memory library) and a vector database (a full, distributed database system): functionality, architecture, scale, cost, examples, and when to use which.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html" aria-current="page">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 5 · Lesson 22</p>
+      <h1>Vector Stores vs Vector Databases</h1>
+
+      <p class="lead">
+        Once chunks are embedded, the vectors need a home: a <strong>vector store</strong> or a
+        <strong>vector database</strong>. People often treat them as the same thing; they aren't.
+        Either one is then searched by similarity to find the chunks for a question.
+      </p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 200" role="img" aria-label="Chunks go through an embedding model to become vectors, which are stored either in a vector store or a vector database; both can then be searched for similar meaning.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <rect x="0" y="74" width="110" height="52" rx="8" class="d-box"/>
+            <text x="55" y="105" text-anchor="middle" class="d-small">chunks</text>
+            <line x1="110" y1="100" x2="148" y2="100" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="150" y="74" width="150" height="52" rx="8" class="d-box"/>
+            <text x="225" y="98" text-anchor="middle" class="d-small">embedding model</text>
+            <text x="225" y="115" text-anchor="middle" class="d-muted">→ vectors</text>
+
+            <line x1="300" y1="92" x2="368" y2="52" class="d-line" marker-end="url(#ah1)"/>
+            <line x1="300" y1="108" x2="368" y2="148" class="d-line" marker-end="url(#ah1)"/>
+
+            <rect x="370" y="18" width="200" height="56" rx="8" class="d-box ok"/>
+            <text x="470" y="41" text-anchor="middle" class="d-small">Vector store</text>
+            <text x="470" y="59" text-anchor="middle" class="d-muted">library, in memory</text>
+            <rect x="370" y="126" width="200" height="56" rx="8" class="d-box accent"/>
+            <text x="470" y="149" text-anchor="middle" class="d-small">Vector database</text>
+            <text x="470" y="167" text-anchor="middle" class="d-muted">full system, distributed</text>
+
+            <line x1="570" y1="46" x2="618" y2="88" class="d-line" marker-end="url(#ah1)"/>
+            <line x1="570" y1="154" x2="618" y2="112" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="620" y="74" width="140" height="52" rx="8" class="d-box"/>
+            <text x="690" y="98" text-anchor="middle" class="d-small">similarity</text>
+            <text x="690" y="115" text-anchor="middle" class="d-small">search</text>
+          </svg>
+        </div>
+        <figcaption>Either option holds the vectors and answers similarity searches; they differ in scale and features.</figcaption>
+      </figure>
+
+      <h2 id="definitions">The core difference</h2>
+      <div class="split">
+        <div>
+          <h4>Vector store</h4>
+          <p>A <strong>lightweight library</strong> for storing and searching vectors, running in memory or from a local file, wherever your code runs.</p>
+        </div>
+        <div>
+          <h4>Vector database</h4>
+          <p>A <strong>full database system</strong> built for vector data <strong>at scale</strong>, usually running as its own (often cloud) service.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Vector store</th><th>Vector database</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Search</strong></td><td>Simple similarity search: the k nearest vectors to the query (<a href="background-concepts.html#knn" title="Background concepts">KNN</a>)</td><td>Advanced search with metadata filters, plus full <a href="background-concepts.html#crud" title="Background concepts">CRUD</a> (create, read, update, delete)</td></tr>
+            <tr><td><strong>Architecture</strong></td><td><a href="background-concepts.html#in-memory-db" title="Background concepts">In memory</a> or a local file</td><td>Distributed across machines: <a href="background-concepts.html#distributed" title="Background concepts">replication, sharding, high availability</a>, scaling</td></tr>
+            <tr><td><strong>Scale</strong></td><td>Up to ~1 million vectors</td><td>Billions</td></tr>
+            <tr><td><strong>Setup</strong></td><td>Minutes</td><td>Hours or days</td></tr>
+            <tr><td><strong>Cost</strong></td><td>Almost free</td><td>Monthly, by storage, requests and reads/writes</td></tr>
+            <tr><td><strong>Query speed</strong></td><td>Microseconds</td><td>Milliseconds</td></tr>
+            <tr><td><strong>Deployment</strong></td><td>Local</td><td>Cloud (AWS, Azure, GCP, or the provider's own)</td></tr>
+            <tr><td><strong>Best for</strong></td><td>Prototypes, research, small apps</td><td>Production, enterprise data</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="examples">Examples</h2>
+      <div class="split">
+        <div>
+          <h4>Vector stores</h4>
+          <p><strong>FAISS</strong> (Facebook Research: "efficient similarity search and clustering of dense vectors"), <strong>Chroma</strong>, ScaNN, NMSLIB.</p>
+        </div>
+        <div>
+          <h4>Vector databases</h4>
+          <p><strong>Pinecone</strong>, <strong>Qdrant</strong> (local or cloud), Milvus, Vespa, <strong>DataStax</strong>.</p>
+        </div>
+      </div>
+      <p>More on each in <a href="background-concepts.html#vector-dbs" title="Background concepts">Background concepts</a>. The course uses Chroma, FAISS, Astra DB (DataStax) and Pinecone.</p>
+
+      <h2 id="choose">When to use which</h2>
+      <p>
+        A vector store for a proof of concept, under 1 million vectors, the fastest search, a
+        small budget or full control. A vector database for very large scale, production
+        reliability and advanced querying.
+      </p>
+      <p class="keyidea">Start with a vector store for prototyping and learning; move to a vector database when you need production scale, reliability and advanced querying.</p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>Vector store</strong>: a library, local, simple nearest-neighbour search.</li>
+        <li><strong>Vector database</strong>: a distributed system with filters, CRUD and scale.</li>
+        <li><strong>Scale decides</strong>: ~1M vectors and below → store; billions → database.</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="21-similarity-and-semantic-search.html"><small>← Previous</small><span>Similarity and semantic search</span></a>
+        <a class="next" href="23-chromadb-rag-part-1.html"><small>Next →</small><span>RAG with ChromaDB, part 1: load, split, embed</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

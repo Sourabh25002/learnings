@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How the backend is organized</title>
+  <meta name="description" content="The Flask backend explained for Node.js developers: folders, routes, decorators and how it runs in production.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html" aria-current="page">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 2</p>
+      <h1>How the backend is organized</h1>
+
+      <p class="lead">
+        The Python backend is a Flask app. Flask is very close to Express, so if you know
+        Node.js you already know most of it. This lesson maps every Flask idea you'll meet in
+        the Vault code to its Node.js equivalent.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#folders">The folders, in Node terms</a></li>
+          <li><a href="#entry">The starting point</a></li>
+          <li><a href="#routes">Routes, Blueprints and decorators</a></li>
+          <li><a href="#syntax">The syntax you'll see everywhere</a></li>
+          <li><a href="#journey">One request, start to finish</a></li>
+          <li><a href="#production">How it runs in production</a></li>
+          <li><a href="#node">Could this be done in Node.js?</a></li>
+        </ol>
+      </div>
+
+      <h2 id="folders">The folders, in Node terms</h2>
+      <pre><code>pythoncode/
+├── main.py              → app.js        (creates the app, plugs in all routes)
+├── wsgi.py              → server.js     (the file the production server loads)
+├── requirements.txt     → package.json  (list of dependencies)
+├── .env                 → .env
+├── routes/              → routes/ + controllers/   (combined here)
+├── services/            → services/     (business logic)
+│   └── utils.py         → utils/        (helpers)
+├── core/                → config/ + middleware/ + db/
+├── rag/                 → a mini-module of services, only for the Doc Vault
+└── processVaultFiles.py → a separate background script (like a worker.js)</code></pre>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File in <code>core/</code></th><th>Node equivalent</th></tr></thead>
+          <tbody>
+            <tr><td><code>config.py</code></td><td><code>config.js</code> that reads <code>process.env</code></td></tr>
+            <tr><td><code>middleware.py</code></td><td><code>authMiddleware.js</code> (JWT check)</td></tr>
+            <tr><td><code>database.py</code></td><td><code>db.js</code> with a <code>mysql2</code> connection pool</td></tr>
+            <tr><td><code>metaFiles.py</code></td><td>a file of SQL queries (<code>queries.js</code>)</td></tr>
+            <tr><td><code>logger.py</code></td><td><code>winston</code> / <code>logger.js</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout">
+        <span class="callout-title">Route and controller are one function here</span>
+        <p>
+          In Node you'd usually have <code>routes/vault.js</code> and <code>controllers/vaultController.js</code>.
+          Here, each route function also contains the controller logic: read the request, check
+          things, call services, send the response. Heavy work (S3, quota, AI) is still pulled out
+          into <code>services/</code> and <code>rag/</code>.
+        </p>
+        <pre><code>Node:   route → controller → service → database
+Here:   route + controller (one function) → service → database</code></pre>
+      </div>
+
+      <h2 id="entry">The starting point</h2>
+      <p><code>main.py</code> is the <code>app.js</code>. Its <code>createApp()</code> function:</p>
+      <ol>
+        <li>Creates the Flask app.</li>
+        <li>Sets up CORS, with allowed origins from config.</li>
+        <li>Registers 5 route files: <code>stockRoutes</code>, <code>fileRoutes</code>, <code>chatRoutes</code>, <code>vaultRoutes</code>, <code>portfolioRoutes</code>.</li>
+        <li>Adds a global error handler.</li>
+        <li>Adds cleanup that closes the MySQL connection pool on shutdown.</li>
+      </ol>
+      <pre><code>// Express                         # Flask (main.py)
+const app = express();             app = Flask(__name__)
+app.use(cors());                   CORS(app, ...)
+app.use(vaultRoutes);              app.register_blueprint(vaultRoutes)
+app.listen(8000);                  serve(app, port=8000)</code></pre>
+      <p>Locally you run <code>python main.py</code>. In production, the server loads <code>wsgi.py</code>, which is just <code>from main import app</code>.</p>
+
+      <h2 id="routes">Routes, Blueprints and decorators</h2>
+      <p>A <strong>Blueprint</strong> is Flask's <code>express.Router()</code>. Each file in <code>routes/</code> creates one and adds endpoints to it.</p>
+      <pre><code>@vaultRoutes.route("/upload", methods=["POST"])   # 1. register the endpoint
+@requireAuth                                      # 2. middleware: check the login token
+def upload():                                     # 3. the handler
+    ...</code></pre>
+      <p>
+        Lines starting with <code>@</code> are <strong>decorators</strong>: they attach extra behaviour
+        to the function below. A request goes through them top to bottom: route match → auth
+        check → your function. The same thing in Express:
+      </p>
+      <pre><code>router.post("/upload", requireAuth, upload);</code></pre>
+
+      <h3>Docstrings</h3>
+      <p>
+        Text in triple quotes as the first line inside a function (<code>"""Fast upload: ..."""</code>)
+        is a <strong>docstring</strong>: the function's description, like a JSDoc comment. Python
+        doesn't run it. Editors show it when you hover the function name.
+      </p>
+      <div class="callout warn">
+        <span class="callout-title">Docstrings can be out of date</span>
+        <p>
+          Several docstrings in the Vault code describe older versions (Textract, command-line
+          options that don't exist). When a docstring and the code disagree, trust the code.
+        </p>
+      </div>
+
+      <h2 id="syntax">The syntax you'll see everywhere</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Express</th><th>Flask</th></tr></thead>
+          <tbody>
+            <tr><td><code>req.body</code></td><td><code>request.json</code> or <code>request.get_json()</code></td></tr>
+            <tr><td><code>req.body</code> (form data)</td><td><code>request.form.get("userId")</code></td></tr>
+            <tr><td><code>req.files</code> (multer)</td><td><code>request.files.getlist("files")</code></td></tr>
+            <tr><td><code>req.query</code></td><td><code>request.args</code></td></tr>
+            <tr><td><code>res.json(x)</code></td><td><code>return jsonify(x)</code></td></tr>
+            <tr><td><code>res.status(400).json(x)</code></td><td><code>return jsonify(x), 400</code></td></tr>
+            <tr><td><code>app.use(errorHandler)</code></td><td><code>@app.errorhandler(Exception)</code></td></tr>
+            <tr><td><code>null</code></td><td><code>None</code></td></tr>
+            <tr><td><code>obj.key</code> (crashes if missing)</td><td><code>d["key"]</code></td></tr>
+            <tr><td><code>obj.key ?? ""</code></td><td><code>d.get("key", "")</code></td></tr>
+            <tr><td><code>arr.map((x, i) =&gt; ...)</code></td><td><code>[... for i, x in enumerate(arr)]</code></td></tr>
+            <tr><td><code>arr.filter(x =&gt; ...)</code></td><td><code>[x for x in arr if ...]</code></td></tr>
+            <tr><td>TypeScript types</td><td>type hints: <code>def f(x: dict) -&gt; bool</code> (not enforced)</td></tr>
+            <tr><td><code>require</code> / <code>import</code></td><td><code>from x import y</code></td></tr>
+            <tr><td><code>if (require.main === module)</code></td><td><code>if __name__ == "__main__":</code></td></tr>
+            <tr><td><code>npm install</code></td><td><code>pip install -r requirements.txt</code></td></tr>
+            <tr><td>pm2</td><td>gunicorn + supervisord</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="journey">One request, start to finish</h2>
+      <p>Say the frontend calls <code>POST /vault_llm_chat</code>:</p>
+      <ol class="steps">
+        <li><span class="step-title">main.py</span><span class="step-body">The app receives the request.</span></li>
+        <li><span class="step-title">vaultRoutes.py</span><span class="step-body">The URL matches <code>/vault_llm_chat</code>.</span></li>
+        <li><span class="step-title">@requireAuth</span><span class="step-body">The middleware in <code>core/middleware.py</code> checks the JWT. It looks in the JSON body (<code>auth_token</code>), the form data, then the <code>Authorization</code> header. On success it stores the user's ID as <code>g.userId</code>.</span></li>
+        <li><span class="step-title">The route function</span><span class="step-body">Reads <code>userId</code> and <code>query</code>, checks in the database that the file is ready.</span></li>
+        <li><span class="step-title">The service</span><span class="step-body"><code>vaultChat()</code> in <code>services/docVaultLlm.py</code> does the AI work.</span></li>
+        <li><span class="step-title">The response</span><span class="step-body">The route sends the answer back as JSON.</span></li>
+      </ol>
+      <p class="keyidea">Every endpoint follows the same path: route → middleware → handler → service → database / S3 / AI → response.</p>
+
+      <h2 id="production">How it runs in production</h2>
+      <p>One Docker container runs <strong>two programs side by side</strong>, managed by <strong>supervisord</strong> (like pm2):</p>
+      <pre><code>One Docker container
+└── supervisord   (starts both, restarts either if it crashes)
+      ├── gunicorn   → the web server (all the API routes), port 8080
+      └── cron       → every 5 minutes runs processVaultFiles.py (the worker)</code></pre>
+      <p>Lesson 4 explains the worker and why it's a separate program.</p>
+
+      <h2 id="node">Could this be done in Node.js?</h2>
+      <p>Almost all of it. Python is just the more common choice for AI work.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Job</th><th>Python (here)</th><th>Node.js option</th></tr></thead>
+          <tbody>
+            <tr><td>Web server</td><td>Flask</td><td>Express</td></tr>
+            <tr><td>JWT</td><td>PyJWT</td><td>jsonwebtoken</td></tr>
+            <tr><td>MySQL</td><td>mysql-connector</td><td>mysql2</td></tr>
+            <tr><td>S3</td><td>boto3</td><td>AWS SDK for JavaScript</td></tr>
+            <tr><td>Scheduled job</td><td>cron + script</td><td>node-cron, or cron + script</td></tr>
+            <tr><td>PDF text</td><td>pdfplumber</td><td>pdf-parse, pdfjs</td></tr>
+            <tr><td>Embeddings</td><td>FastEmbed (local)</td><td>Transformers.js, or an embedding API</td></tr>
+            <tr><td>Vector database</td><td>ChromaDB</td><td>ChromaDB (has a JS client)</td></tr>
+            <tr><td>Gemini</td><td>Google GenAI SDK</td><td>Google GenAI SDK for JS</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Python is stronger at finding tables in PDFs (Camelot), running AI models on your own
+        server, and data work (pandas). Almost every AI library comes out for Python first.
+      </p>
+      <div class="callout tip">
+        <span class="callout-title">Tip: rebuild it to really learn it</span>
+        <p>
+          Every idea here (upload, background worker, chunking, embeddings, vector search) is the
+          same in any language. Rebuilding the Vault in Node.js as a personal project is a great
+          way to make sure you understand it, and that project is fully yours.
+        </p>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="01-what-is-the-doc-vault.html"><small>← Previous</small><span>What is the Document Vault?</span></a>
+        <a class="next" href="03-uploading-a-file.html"><small>Next →</small><span>Uploading a file</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chunking</title>
+  <meta name="description" content="Why and how page text is cut into overlapping 1,000-character chunks with metadata.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html" aria-current="page">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 6</p>
+      <h1>Chunking</h1>
+
+      <p class="lead">
+        Chunking means cutting each page's text into small pieces, so that later we can find
+        just the relevant piece for a question instead of handing the AI a whole document. It's
+        the first step of <code>indexDocument</code> in <code>rag/indexer.py</code>.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#why">Why chunk?</a></li>
+          <li><a href="#calls">Where it happens</a></li>
+          <li><a href="#how">How a page becomes chunks</a></li>
+          <li><a href="#overlap">Sliding window and overlap</a></li>
+          <li><a href="#metadata">Metadata and IDs</a></li>
+          <li><a href="#example">A worked example</a></li>
+          <li><a href="#old">indexer.py vs chunker.py</a></li>
+          <li><a href="#notice">Things worth noticing</a></li>
+        </ol>
+      </div>
+
+      <h2 id="why">Why chunk?</h2>
+      <p>
+        When the user asks "what's my closing balance?", the answer is in one or two lines of one
+        page. If each searchable unit were a whole document, search could only say "it's somewhere
+        in this file". Small pieces make search precise: it can return the exact few pieces that
+        matter, and only those are sent to the AI.
+      </p>
+      <div class="analogy">
+        <p>
+          Index cards instead of a book. To answer a question you pull out the 5 most relevant
+          cards, rather than photocopying the whole book.
+        </p>
+      </div>
+      <p>The trade-off: pieces too big contain lots of unrelated text; pieces too small lose context (a number without the sentence explaining it).</p>
+
+      <h2 id="calls">Where it happens</h2>
+      <pre><code>processFile()                         processVaultFiles.py
+ └── indexDocument()                  rag/indexer.py
+       └── chunkDocument()            rag/indexer.py   ← chunking
+             ├── _splitTextIntoParagraphs()
+             └── _chunkTextParagraph()</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Function</th><th>Job</th></tr></thead>
+          <tbody>
+            <tr><td><code>chunkDocument</code></td><td>Goes page by page; attaches metadata to each chunk</td></tr>
+            <tr><td><code>_splitTextIntoParagraphs</code></td><td>Splits a page's text wherever there's a blank line</td></tr>
+            <tr><td><code>_chunkTextParagraph</code></td><td>Cuts long text into pieces of at most 1,000 characters, 200 overlapping</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="how">How a page becomes chunks</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Skip empty pages</span>
+          <span class="step-body">No content → move on.</span>
+        </li>
+        <li>
+          <span class="step-title">Split into paragraphs</span>
+          <span class="step-body">Cut wherever there's a blank line (<code>\n\n</code>) and drop empty pieces. pdfplumber usually separates lines with a <em>single</em> newline, so in practice a whole page often comes out as one big paragraph.</span>
+        </li>
+        <li>
+          <span class="step-title">Table or text?</span>
+          <span class="step-body">A paragraph starting with <code>|</code> is treated as a table and kept as one whole chunk, never cut. Everything else is text.</span>
+        </li>
+        <li>
+          <span class="step-title">Cut long text</span>
+          <span class="step-body">1,000 characters or less → one chunk. Longer → the sliding window below.</span>
+        </li>
+        <li>
+          <span class="step-title">Label each chunk</span>
+          <span class="step-body">Attach the file name, page number, position and type.</span>
+        </li>
+      </ol>
+
+      <h2 id="overlap">Sliding window and overlap</h2>
+      <ol>
+        <li>Take characters 0 → 1,000.</li>
+        <li>Don't cut a word in half: move the cut back to the last space, as long as that's past the halfway point.</li>
+        <li>Start the next chunk <strong>200 characters before</strong> the previous one ended.</li>
+        <li>Repeat until the end of the text.</li>
+      </ol>
+      <pre><code>A 2,300-character page:
+Chunk 0:  characters     0 → ~1,000
+Chunk 1:  characters  ~800 → ~1,800     (starts 200 before chunk 0 ended)
+Chunk 2:  characters ~1,600 → 2,300</code></pre>
+      <p class="keyidea">
+        Overlap exists because a sentence that falls exactly on a cut would be split between two
+        chunks, and neither half would make sense alone. With 200 characters of overlap, it
+        appears whole in at least one chunk.
+      </p>
+
+      <h2 id="metadata">Metadata and IDs</h2>
+      <p>Every chunk carries a label:</p>
+      <pre><code>{
+  "text": "01-09-26 Salary 50,000\n05-09-26 Rent -15,000 ...",
+  "metadata": {
+    "documentName": "hdfc_statement.pdf",   # readable name (displayName), not the docName
+    "pageNumber": 2,
+    "chunkIndex": 1,                         # 2nd chunk on this page; restarts at 0 each page
+    "contentType": "text"                    # or "table"
+  }
+}</code></pre>
+      <p>The metadata is how a chat answer can say "Source: hdfc_statement.pdf, page 2".</p>
+      <p>Each chunk also gets a unique ID:</p>
+      <pre><code>{docName}_p{page}_c{chunkIndex}_{8 random characters}
+42_1760345678123_p2_c1_c81b9a03</code></pre>
+      <p>The random part (from <code>uuid</code>) guarantees no two IDs are ever the same.</p>
+
+      <h2 id="example">A worked example</h2>
+      <p><code>hdfc_statement.pdf</code>, 2 pages: page 1 is short (~200 characters), page 2 is long (~2,300 characters of transactions).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Page</th><th>Length</th><th>Chunks</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>~200 chars</td><td>1 chunk (fits in 1,000)</td></tr>
+            <tr><td>2</td><td>~2,300 chars</td><td>3 overlapping chunks</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Result: <strong>4 chunks</strong>, each with text and metadata. If there were none, <code>indexDocument</code> would return 0 straight away.</p>
+
+      <h2 id="old">indexer.py vs chunker.py</h2>
+      <p>There are two chunking implementations. Only one runs.</p>
+      <div class="split">
+        <div>
+          <h4><code>rag/indexer.py</code> (used, Jun–Aug 2026)</h4>
+          <ul>
+            <li>Size in <strong>characters</strong>: ≤1,000, 200 overlap</li>
+            <li>Splits on blank lines</li>
+            <li>Keeps <code>|</code> blocks whole as tables</li>
+          </ul>
+        </div>
+        <div>
+          <h4><code>rag/chunker.py</code> (unused, Feb 2026)</h4>
+          <ul>
+            <li>Size in <strong>tokens</strong> (how AI models count text), aiming for ~350</li>
+            <li>Detects financial sections ("Balance Sheet", "Cash Flow", "Risk Factors") and tags chunks with them</li>
+            <li>Detects tables and keeps them whole</li>
+            <li>Built for Docling, an older PDF reader the team replaced</li>
+          </ul>
+        </div>
+      </div>
+      <p>When the pipeline was rebuilt, the new chunking was written inside <code>indexer.py</code> and <code>chunker.py</code> was never deleted. Its ideas (tokens, sections) are good candidates to bring back.</p>
+
+      <h2 id="notice">Things worth noticing</h2>
+      <div class="callout warn">
+        <span class="callout-title">Weak spots</span>
+        <ul>
+          <li><strong>Characters, not tokens.</strong> AI models measure text in tokens, so token-based sizing is more precise.</li>
+          <li><strong>Whole pages are often one paragraph</strong>, so chunks are cut purely by the 1,000-character window, not at natural boundaries like headings.</li>
+          <li><strong>The table rule rarely triggers.</strong> pdfplumber's text has tables as space-separated lines, not <code>|</code>. The <code>|</code> format only exists in the table data the Vault throws away.</li>
+        </ul>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="05-getting-text-out-of-a-pdf.html"><small>← Previous</small><span>Getting text out of a PDF</span></a>
+        <a class="next" href="07-embeddings.html"><small>Next →</small><span>Embeddings</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

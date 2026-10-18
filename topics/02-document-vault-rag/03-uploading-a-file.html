@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uploading a file</title>
+  <meta name="description" content="How POST /upload saves files to S3 and the database, the 100MB quota, the vaultFiles table and upload edge cases.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html" aria-current="page">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 3</p>
+      <h1>Uploading a file</h1>
+
+      <p class="lead">
+        Everything starts with <code>POST /upload</code> in <code>routes/vaultRoutes.py</code>.
+        It does only two things: put the file in S3, and write a database row saying "pending".
+        No text extraction, no AI. That's left to the background worker.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#routes">The Vault endpoints</a></li>
+          <li><a href="#request">What the frontend sends</a></li>
+          <li><a href="#flow">The upload, step by step</a></li>
+          <li><a href="#quota">The 100MB quota</a></li>
+          <li><a href="#table">The vaultFiles table</a></li>
+          <li><a href="#good">What's done well</a></li>
+          <li><a href="#gaps">Gaps and edge cases</a></li>
+        </ol>
+      </div>
+
+      <h2 id="routes">The Vault endpoints</h2>
+      <p>All 9 endpoints in <code>vaultRoutes.py</code>, grouped by the life of a document:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Stage</th><th>Endpoint</th><th>Job</th></tr></thead>
+          <tbody>
+            <tr><td>Upload</td><td><code>/upload</code></td><td>Save files to S3, DB status "pending"</td></tr>
+            <tr><td>Processing</td><td><code>/vault/internal/pending</code></td><td>The worker asks "which files are waiting?"</td></tr>
+            <tr><td>Processing</td><td><code>/vault/internal/update_status</code></td><td>The worker reports processing / completed / error</td></tr>
+            <tr><td>Status</td><td><code>/list_uploads</code></td><td>All of a user's files and their statuses</td></tr>
+            <tr><td>Status</td><td><code>/file_status</code></td><td>One file's status</td></tr>
+            <tr><td>Chat</td><td><code>/load_index</code></td><td>Pre-load a document's index so the first chat is fast</td></tr>
+            <tr><td>Chat</td><td><code>/vault_llm_chat</code></td><td>Ask a question (normal or streamed)</td></tr>
+            <tr><td>Delete</td><td><code>/delete_files</code></td><td>Remove from ChromaDB, S3 (PDF and index) and the DB</td></tr>
+            <tr><td>Other</td><td><code>/ocr</code></td><td>Internal PDF-to-text tool. Not part of the Vault flow</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The two <code>/vault/internal/...</code> routes and <code>/ocr</code> use
+        <code>@requireInternalAuth</code> (a secret key) instead of <code>@requireAuth</code>
+        (a user's login). They're for other programs, not for users.
+      </p>
+
+      <h2 id="request">What the frontend sends</h2>
+      <p>
+        The Vault page (<code>aumsampaan/src/pages/Vault/Vault.tsx</code>) sends a
+        <code>multipart/form-data</code> request, built with <code>FormData</code> in
+        <code>services/vaultService.ts</code>:
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Value</th><th>Read in Python with</th></tr></thead>
+          <tbody>
+            <tr><td><code>files</code></td><td>One or more PDFs</td><td><code>request.files.getlist("files")</code></td></tr>
+            <tr><td><code>userId</code></td><td>The user's ID</td><td><code>request.form.get("userId")</code></td></tr>
+            <tr><td><code>userName</code></td><td>The user's <strong>first name</strong></td><td><code>request.form.get("userName")</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <code>getlist</code> returns all files; plain <code>.get</code> would return only the first.
+        The frontend also checks: PDFs only, at most 5MB each, and a maximum number of pages.
+      </p>
+
+      <h2 id="flow">The upload, step by step</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Auth check</span>
+          <span class="step-body"><code>@requireAuth</code> verifies the login token before the function runs.</span>
+        </li>
+        <li>
+          <span class="step-title">Read the request</span>
+          <span class="step-body"><code>userId</code>, <code>files</code>, <code>userName</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">Basic checks</span>
+          <span class="step-body">No files → 400 "No files provided". No <code>userName</code> → 400 "userName is required".</span>
+        </li>
+        <li>
+          <span class="step-title">Early quota check</span>
+          <span class="step-body">Is the user already at 100MB? Then reject straight away. (See below.)</span>
+        </li>
+        <li>
+          <span class="step-title">Prepare each file</span>
+          <span class="step-body">
+            Clean the file name (<code>sanitizeFilename</code>, so names like <code>../../hack.pdf</code> can't touch server folders).
+            Build a unique S3 name: <code>vaultFile/{userId}_{timeInMilliseconds}.pdf</code>.
+            Save the file into its own temporary folder and measure its real size.
+          </span>
+        </li>
+        <li>
+          <span class="step-title">Real quota check</span>
+          <span class="step-body">Do all these files together fit in the remaining quota?</span>
+        </li>
+        <li>
+          <span class="step-title">Upload each file</span>
+          <span class="step-body">Upload to S3, count the PDF's pages, insert a row in <code>vaultFiles</code> with status <strong>pending</strong>, log it.</span>
+        </li>
+        <li>
+          <span class="step-title">Add to the user's usage</span>
+          <span class="step-body"><code>incrementUsage</code> adds the uploaded bytes to the quota.</span>
+        </li>
+        <li>
+          <span class="step-title">Reply</span>
+          <span class="step-body"><code>{"message": "Upload complete. Files will be processed in background."}</code></span>
+        </li>
+        <li>
+          <span class="step-title">Clean up, always</span>
+          <span class="step-body">A <code>finally</code> block deletes every temp file and folder, whether the upload worked or not.</span>
+        </li>
+      </ol>
+      <p class="keyidea">The upload is "fast" because it only stores the file. The slow work happens later, in the worker.</p>
+
+      <div class="callout">
+        <span class="callout-title">Why save to a temp folder first?</span>
+        <p>
+          Before a file is saved, Flask often reports its size as 0. Saving it to disk gives the
+          real size, which the quota check needs. It also gives the page counter a real file to open.
+        </p>
+      </div>
+
+      <h2 id="quota">The 100MB quota</h2>
+      <p>
+        <em>This part is my own work: commit "100MB file size limit implementation", 11 Sep 2026.</em>
+        It added <code>services/fileQuota.py</code> and restructured the upload into two passes.
+      </p>
+      <p>Each user has a lifetime limit of 100MB, stored in the <code>userFileQuota</code> table (one row per user: <code>usedBytes</code>, <code>limitBytes</code>).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Function</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>getQuota(userId)</code></td><td>Reads used and limit. No row yet means 0 used.</td></tr>
+            <tr><td><code>checkQuota(userId, bytes)</code></td><td>"Would these bytes fit?" Returns <code>allowed</code>, <code>remainingBytes</code>, <code>message</code>. Never changes anything.</td></tr>
+            <tr><td><code>incrementUsage(userId, bytes)</code></td><td>Adds bytes to <code>usedBytes</code>, creating the row if needed. Only called after a successful upload.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Why there are two checks</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Check</th><th>Question</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><code>checkQuota(userId, 1)</code></td><td>"Is there <em>any</em> space left?"</td><td>The real sizes aren't known yet, so it asks about 1 byte. If the user is already full, reject before doing any work.</td></tr>
+            <tr><td><code>checkQuota(userId, totalBytes)</code></td><td>"Do <em>these exact files</em> fit?"</td><td>After saving and measuring them.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The first check is a shortcut: <strong>fail fast before doing expensive work.</strong></p>
+
+      <h3>Before and after my change</h3>
+      <div class="split">
+        <div>
+          <h4>Before (one loop)</h4>
+          <p>For each file: save to temp, upload to S3, save to DB, clean up. No size checks. The S3 name used <code>userName</code>.</p>
+        </div>
+        <div>
+          <h4>After (two passes)</h4>
+          <p>Early check → save and measure all files → real check → upload all → count usage → clean up everything in one <code>finally</code>. The S3 name uses <code>userId</code>.</p>
+        </div>
+      </div>
+
+      <h2 id="table">The vaultFiles table</h2>
+      <p>One row per uploaded file. All its SQL is in <code>core/metaFiles.py</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Column</th><th>Holds</th></tr></thead>
+          <tbody>
+            <tr><td><code>id</code></td><td>Row ID</td></tr>
+            <tr><td><code>userId</code></td><td>Who uploaded it</td></tr>
+            <tr><td><code>fileName</code></td><td>Original name, e.g. <code>statement.pdf</code></td></tr>
+            <tr><td><code>s3Key</code></td><td>Where the PDF is in S3</td></tr>
+            <tr><td><code>fileSizeMb</code>, <code>totalPages</code></td><td>Size and page count</td></tr>
+            <tr><td><code>status</code></td><td>pending / processing / completed / error</td></tr>
+            <tr><td><code>uploadedAt</code>, <code>processedAt</code></td><td>When uploaded, when processing finished</td></tr>
+            <tr><td><code>chunkCount</code></td><td>How many chunks it became</td></tr>
+            <tr><td><code>indexS3Key</code></td><td>Where its search index is backed up in S3</td></tr>
+            <tr><td><code>errorMessage</code></td><td>Why it failed</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The insert uses <code>ON DUPLICATE KEY UPDATE</code>: if a matching row already exists
+        (it looks like one row per user + file name), it's overwritten and reset to pending
+        instead of creating a second row.
+      </p>
+
+      <h2 id="good">What's done well</h2>
+      <ul class="checklist">
+        <li>Temp files are always cleaned up (<code>finally</code>)</li>
+        <li>File names are sanitized</li>
+        <li>Each file gets its own temp folder, so two files with the same name don't clash</li>
+        <li>Quota is checked before work, and usage is only counted after success</li>
+        <li>It replies fast and leaves heavy work to the background</li>
+      </ul>
+
+      <h2 id="gaps">Gaps and edge cases</h2>
+      <div class="callout edge">
+        <span class="callout-title">Things that can go wrong</span>
+        <ul>
+          <li><strong>A user can upload into someone else's account.</strong> The route uses the <code>userId</code> sent by the frontend, not <code>g.userId</code> from the login token. Change <code>userId</code> in the request and the file lands in another user's vault, using their quota.</li>
+          <li><strong>The backend doesn't check the file.</strong> PDF-only, 5MB and the page limit are only checked in the frontend. Calling the API directly (Postman, a script) can upload any file type or size.</li>
+          <li><strong>Re-uploading the same file name leaves garbage.</strong> The DB row is overwritten with the new S3 name, so the old PDF and its old index stay in S3 forever with nothing pointing to them. The quota counts both.</li>
+          <li><strong>Half-finished uploads.</strong> With 3 files, if file 3 fails, files 1 and 2 are already uploaded but the user sees an error. They retry and create duplicates. The quota isn't increased for files 1 and 2 either, because the error skips that step.</li>
+          <li><strong>S3 succeeds, DB fails.</strong> The PDF sits in S3 with no record of it.</li>
+          <li><strong>Same-millisecond names.</strong> Two small files saved within the same millisecond get the same S3 name, and one overwrites the other. Adding a random part (UUID) fixes it.</li>
+          <li><strong><code>userName</code> is required but never used.</strong> It used to be part of the S3 name. My quota change switched that to <code>userId</code>, and the check stayed behind. A user with no first name can't upload at all.</li>
+          <li><strong>Two uploads at the same moment can beat the quota.</strong> Both check "is there space?", both see yes, and both upload. Rare and low impact.</li>
+        </ul>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="02-how-the-backend-is-organized.html"><small>← Previous</small><span>How the backend is organized</span></a>
+        <a class="next" href="04-the-background-worker.html"><small>Next →</small><span>The background worker</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

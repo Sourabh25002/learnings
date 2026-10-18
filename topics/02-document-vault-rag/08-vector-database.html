@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Storing vectors - ChromaDB and S3</title>
+  <meta name="description" content="ChromaDB as one small database per document, how it's written, backed up to S3 and marked completed.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html" aria-current="page">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 8</p>
+      <h1>Storing vectors: ChromaDB and S3</h1>
+
+      <p class="lead">
+        Once chunks are turned into numbers, they need to be stored somewhere that can answer
+        "which chunks are closest to this question?". That's a vector database. The Vault gives
+        every document its own small ChromaDB database, and backs it up to S3.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#vector-db">What a vector database is</a></li>
+          <li><a href="#chroma">ChromaDB: a database that's just a folder</a></li>
+          <li><a href="#per-doc">One database per document</a></li>
+          <li><a href="#steps">indexDocument's storage steps</a></li>
+          <li><a href="#s3">Backing up to S3</a></li>
+          <li><a href="#done">Marking the file completed</a></li>
+          <li><a href="#whole">The whole of indexDocument</a></li>
+          <li><a href="#gaps">Gaps</a></li>
+        </ol>
+      </div>
+
+      <h2 id="vector-db">What a vector database is</h2>
+      <p>
+        A <strong>vector</strong> is just a list of numbers, like an embedding. A <strong>vector
+        database</strong> stores those lists next to their text, and answers one special
+        question fast: "give me the stored items whose numbers are closest to these numbers".
+        A normal database answers "find rows where X equals Y"; a vector database answers "find
+        rows that <em>mean</em> something similar".
+      </p>
+
+      <h2 id="chroma">ChromaDB: a database that's just a folder</h2>
+      <pre><code>client = chromadb.PersistentClient(path="data/chromadb/42_1760345678123")
+collection = client.get_or_create_collection(name="financial_documents")</code></pre>
+      <ul>
+        <li><strong><code>PersistentClient</code></strong> saves to disk in that folder, not just in memory. Like SQLite: the whole database is files in a folder.</li>
+        <li><strong>A collection</strong> is like a table. Ours is called <code>financial_documents</code>.</li>
+      </ul>
+      <p>Each chunk becomes one record:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>id</th><th>document (text)</th><th>embedding</th><th>metadata</th></tr></thead>
+          <tbody>
+            <tr><td><code>..._p2_c1_c81b9a03</code></td><td>"01-09-26 Salary..."</td><td>[0.021, -0.113, ...]</td><td>{documentName, pageNumber: 2, chunkIndex: 1, contentType}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="per-doc">One database per document</h2>
+      <pre><code>data/chromadb/
+├── 42_1760345678123/     ← one user's statement
+├── 42_1760399990000/     ← the same user's contract note
+└── 77_1760412345678/     ← another user's file</code></pre>
+      <ul>
+        <li><strong>Isolation:</strong> one user's chunks can never show up in another user's search.</li>
+        <li><strong>Easy delete:</strong> deleting a document = deleting its folder.</li>
+        <li><strong>Easy backup:</strong> one folder = one upload to S3.</li>
+      </ul>
+      <p>The cost: chat has to open (and maybe download) a separate database for each document it searches. Lessons 9–10 cover that side.</p>
+
+      <h2 id="steps">indexDocument's storage steps</h2>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Prepare 3 parallel lists</span>
+          <span class="step-body">ChromaDB wants texts, metadatas and ids as separate lists, in the same order.</span>
+        </li>
+        <li>
+          <span class="step-title">Fresh folder</span>
+          <span class="step-body"><code>data/chromadb/{docName}/</code>. If it already exists (the file is being re-processed), delete it first, so old and new chunks never mix.</span>
+        </li>
+        <li>
+          <span class="step-title">Open ChromaDB</span>
+          <span class="step-body">A <code>PersistentClient</code> in that folder, collection <code>financial_documents</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">Embed and add, in batches of 24</span>
+          <span class="step-body"><code>collection.add(documents, embeddings, metadatas, ids)</code>. Lesson 7.</span>
+        </li>
+        <li>
+          <span class="step-title">Close it</span>
+          <span class="step-body"><code>del client</code> / <code>del collection</code> release the connection, making sure everything is written to disk before the folder is uploaded.</span>
+        </li>
+        <li>
+          <span class="step-title">Upload the folder to S3</span>
+          <span class="step-body">If that fails, raise an error, and the worker marks the file "error".</span>
+        </li>
+        <li>
+          <span class="step-title">Return the chunk count</span>
+          <span class="step-body">Logged as "Document '...' indexed (4 chunks) and backed up to S3."</span>
+        </li>
+      </ol>
+
+      <h2 id="s3">Backing up to S3</h2>
+      <p><code>uploadDirToS3</code> in <code>rag/s3Storage.py</code> walks through every file in the folder and uploads each one, keeping the same structure:</p>
+      <pre><code>data/chromadb/42_1760345678123/chroma.sqlite3
+    → s3://&lt;bucket&gt;/vaultFile/42_1760345678123/chroma.sqlite3</code></pre>
+      <p>
+        Why? The server's disk isn't permanent: on a restart or redeploy, local files can
+        disappear. S3 keeps the index safe, and chat can download it whenever it's needed.
+        <code>s3Storage.py</code> also has <code>downloadDirFromS3</code> (used by chat) and
+        <code>deleteIndexFromS3</code> (used by delete).
+      </p>
+
+      <h2 id="done">Marking the file completed</h2>
+      <p>Back in the worker:</p>
+      <pre><code>indexS3Key = f"vaultFile/{docName}/"
+apiUpdateStatus(fileId, "completed", chunkCount=chunkCount, indexS3Key=indexS3Key)</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Column</th><th>Before</th><th>After</th></tr></thead>
+          <tbody>
+            <tr><td><code>status</code></td><td>processing</td><td><strong>completed</strong></td></tr>
+            <tr><td><code>chunkCount</code></td><td>0</td><td>4</td></tr>
+            <tr><td><code>indexS3Key</code></td><td>NULL</td><td><code>vaultFile/42_1760345678123/</code></td></tr>
+            <tr><td><code>processedAt</code></td><td>NULL</td><td>the current time</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>indexS3Key</code> is remembered so chat knows where to download the index from, and delete knows what to remove. The frontend now shows "completed", and the user can chat.</p>
+
+      <h2 id="whole">The whole of indexDocument</h2>
+      <pre><code>pages (text per page)
+  ├─ 1. chunkDocument → ≤1000-char chunks, 200 overlap, with metadata     (Lesson 6)
+  ├─ 2. no chunks? → return 0
+  ├─ 3. build 3 lists: texts, metadatas, ids
+  ├─ 4. fresh folder: data/chromadb/{docName}/
+  ├─ 5. open ChromaDB in that folder
+  ├─ 6. load the embedding model (once)                                   (Lesson 7)
+  ├─ 7. batches of 24: text → 768 numbers → collection.add
+  ├─ 8. close the database (flush to disk)
+  ├─ 9. upload the folder to S3: vaultFile/{docName}/
+  └─ 10. return the chunk count</code></pre>
+
+      <h2 id="gaps">Gaps</h2>
+      <div class="callout edge">
+        <span class="callout-title">Things that can go wrong</span>
+        <ul>
+          <li><strong>0 chunks still means "completed".</strong> If nothing was indexed, <code>indexDocument</code> returns 0 without an error, and the worker marks the file completed with nothing to search.</li>
+          <li><strong>Local folders are never deleted after upload.</strong> The server's disk slowly fills with indexes.</li>
+          <li><strong><code>indexS3Key</code> is built by hand.</strong> The worker copies the naming pattern from <code>s3Storage.py</code> instead of getting the real path back. If someone changes the pattern there, the database points to the wrong place. Cleaner: have <code>indexDocument</code> return the path it used.</li>
+        </ul>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="07-embeddings.html"><small>← Previous</small><span>Embeddings</span></a>
+        <a class="next" href="09-finding-relevant-chunks.html"><small>Next →</small><span>Finding the right pieces: search and reranking</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

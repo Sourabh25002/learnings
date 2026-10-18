@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The background worker</title>
+  <meta name="description" content="How cron runs processVaultFiles.py, the file lock, batches, internal APIs and processFile step by step.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html" aria-current="page">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 4</p>
+      <h1>The background worker</h1>
+
+      <p class="lead">
+        After an upload, the file just sits in S3 marked "pending". The background worker,
+        <code>processVaultFiles.py</code>, picks it up within 5 minutes, extracts the text,
+        indexes it and marks it "completed". This lesson covers how it's scheduled, how it
+        avoids running twice, and what each of its functions does.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#why">Why a background worker?</a></li>
+          <li><a href="#cron">Where the schedule lives</a></li>
+          <li><a href="#separate">Why a separate program?</a></li>
+          <li><a href="#functions">The 7 functions</a></li>
+          <li><a href="#lock">The lock</a></li>
+          <li><a href="#batch">Batches: 10 files, one at a time</a></li>
+          <li><a href="#internal">Talking to the database through the API</a></li>
+          <li><a href="#processfile">processFile, step by step</a></li>
+          <li><a href="#gaps">Gaps</a></li>
+          <li><a href="#scale">When this stops being enough</a></li>
+        </ol>
+      </div>
+
+      <h2 id="why">Why a background worker?</h2>
+      <p>
+        Extracting text and creating embeddings for a PDF can take from a few seconds to a few
+        minutes. If the upload request did that work, the user would stare at a spinner, and the
+        request could time out. So the upload replies immediately, and a separate program does
+        the heavy work later.
+      </p>
+
+      <h2 id="cron">Where the schedule lives</h2>
+      <p class="keyidea">
+        The schedule isn't in the Python code. <code>processVaultFiles.py</code> only knows
+        <em>what</em> to do. Linux's built-in <code>cron</code> decides <em>when</em>.
+      </p>
+      <div class="split">
+        <div>
+          <h4>Node.js way</h4>
+          <p>The timer lives inside your app:</p>
+          <pre><code>// app.js
+cron.schedule("*/5 * * * *",
+  () =&gt; processFiles());</code></pre>
+        </div>
+        <div>
+          <h4>This project</h4>
+          <p>The timer is Linux's <code>cron</code>, set up in the <code>Dockerfile</code>. Every 5 minutes it starts the script as a fresh program.</p>
+        </div>
+      </div>
+
+      <h3>1. The rule: <code>Dockerfile</code>, line 37</h3>
+      <pre><code>*/5 * * * * appuser /usr/local/bin/python /app/processVaultFiles.py &gt;&gt; /var/log/vault-processor.log 2&gt;&amp;1</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Part</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>*/5 * * * *</code></td><td>every 5 minutes</td></tr>
+            <tr><td><code>appuser</code></td><td>run as a normal user, not root (safer)</td></tr>
+            <tr><td><code>python /app/processVaultFiles.py</code></td><td>the command</td></tr>
+            <tr><td><code>&gt;&gt; /var/log/vault-processor.log 2&gt;&amp;1</code></td><td>save all output and errors to this log file</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>2. Keeping cron running: <code>supervisord.conf</code></h3>
+      <pre><code>[program:cron]
+command=/usr/sbin/cron -f
+autostart=true
+autorestart=true</code></pre>
+      <p>supervisord starts cron when the container starts and restarts it if it crashes. The same file starts gunicorn (the web server).</p>
+
+      <div class="callout tip">
+        <span class="callout-title">Tip: where to find the worker's logs</span>
+        <p>In <code>/var/log/vault-processor.log</code> inside the container, <em>not</em> in the normal Docker logs. Easy to miss when debugging.</p>
+      </div>
+
+      <div class="callout">
+        <span class="callout-title">Other schedulers</span>
+        <p>
+          The file's docstring mentions Windows Task Scheduler, cron, systemd timers and a
+          keep-alive loop. They're all tools that run a program on a schedule; it's saying "use
+          whichever your system has". This project runs on Linux, so it's cron.
+        </p>
+      </div>
+
+      <h2 id="separate">Why a separate program?</h2>
+      <p>Why not a timer inside the Flask app?</p>
+      <ul>
+        <li><strong>Crash safety:</strong> if processing a bad PDF crashes the worker, only that run dies. The web server keeps working, and cron starts a fresh run 5 minutes later.</li>
+        <li><strong>Memory is freed:</strong> the script starts, works and <em>exits</em>. All the memory it used (AI model, PDF data) goes back to the system.</li>
+        <li><strong>No blocking:</strong> Python can't run heavy work in parallel well inside one program. Inside Flask, PDF processing would block the threads answering users.</li>
+        <li><strong>No accidental duplicates:</strong> the web server can run several copies of the app and restarts them regularly (gunicorn here restarts after 500 requests). A timer inside the app could get duplicated or killed.</li>
+        <li><strong>Easy to test:</strong> <code>python processVaultFiles.py</code> runs it by hand.</li>
+      </ul>
+
+      <div class="callout warn">
+        <span class="callout-title">But it's the same container</span>
+        <p>
+          The worker and the web server are separate programs, but they share the same CPU and
+          memory. While the worker processes a big PDF, the APIs can get slower. If the worker
+          uses too much memory, the whole container can run out. The Dockerfile limits the AI
+          libraries to 2 CPU threads (<code>OMP_NUM_THREADS=2</code> and similar), probably for this reason.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Setup</th><th>Crash-safe</th><th>Memory freed</th><th>Own CPU and memory</th></tr></thead>
+          <tbody>
+            <tr><td>Timer inside the Flask app</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td><strong>Separate program, same container (now)</strong></td><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Separate container</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The two programs aren't "async" in the Node sense (one program juggling promises). They're
+        two independent programs running at the same time, with the operating system sharing the
+        CPU between them. From the user's point of view, though, the processing is async: the
+        upload doesn't wait for it.
+      </p>
+
+      <h2 id="functions">The 7 functions</h2>
+      <p>
+        When cron starts the file, Python reads it top to bottom. Most of it is <em>function
+        definitions</em>, which don't run anything by themselves. Only the last two lines start the work:
+      </p>
+      <pre><code>if __name__ == "__main__":     # "if this file was run directly"
+    runLoop()</code></pre>
+      <p>Then the functions call each other:</p>
+      <pre><code>runLoop()
+ ├── _acquireProcessorLock()     take the lock, or exit if another run is busy
+ ├── processBatch(10)
+ │     ├── apiGetPending(10)     get up to 10 waiting files
+ │     └── for each file:
+ │           └── processFile()   download → extract text → index → mark completed
+ │                 └── apiUpdateStatus()
+ └── _releaseProcessorLock()     remove the lock</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Function</th><th>Job</th></tr></thead>
+          <tbody>
+            <tr><td><code>runLoop</code></td><td>The entry point. Lock → one batch → unlock. Despite the name, it doesn't loop: one batch, then the program ends.</td></tr>
+            <tr><td><code>_acquireProcessorLock</code></td><td>"Am I the only one running?"</td></tr>
+            <tr><td><code>processBatch</code></td><td>Fetch waiting files and process each one. Logs a summary: "8 succeeded, 2 failed".</td></tr>
+            <tr><td><code>apiGetPending</code></td><td>Asks the web server which files are waiting.</td></tr>
+            <tr><td><code>processFile</code></td><td>⭐ The real work for one file.</td></tr>
+            <tr><td><code>apiUpdateStatus</code></td><td>Tells the web server to save a file's new status.</td></tr>
+            <tr><td><code>_releaseProcessorLock</code></td><td>"I'm done." Deletes the lock file.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="lock">The lock</h2>
+      <h3>Why it's needed</h3>
+      <p>Cron doesn't check whether the last run has finished. Without a lock:</p>
+      <pre><code>0:00  Run 1 fetches 10 pending files, starts file 1 (a big PDF)
+5:00  Run 1 is still on file 1. Files 2–10 are still "pending"
+      (each file is only marked "processing" when its turn comes)
+5:00  Run 2 starts and fetches "pending" files → gets files 2–10 too!</code></pre>
+      <p>Two runs would process the same files: double work, double load on the shared container, and both writing to the same index folder at once.</p>
+
+      <h3>How it works</h3>
+      <p class="keyidea">The lock is just one file: <code>data/vault_processor.lock</code>. File exists → someone is running. No file → free.</p>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Try to create the lock file</span>
+          <span class="step-body"><code>os.open(path, O_CREAT | O_EXCL | O_WRONLY)</code> means "create this file, but only if it doesn't exist". The operating system does this as one all-or-nothing step, so even two runs at the same instant can't both succeed.</span>
+        </li>
+        <li>
+          <span class="step-title">Created? I'm the only one</span>
+          <span class="step-body">Write a small note inside (<code>{"pid": 12345, "createdAt": ...}</code>, just for debugging) and continue.</span>
+        </li>
+        <li>
+          <span class="step-title">Already exists? Check its age</span>
+          <span class="step-body">Under 2 hours old: another run is working, so log "already running" and exit. Over 2 hours: the old run probably crashed without cleaning up, so delete the lock, create a new one and continue.</span>
+        </li>
+        <li>
+          <span class="step-title">When finished, delete it</span>
+          <span class="step-body">In a <code>finally</code> block, so it happens even if processing failed.</span>
+        </li>
+      </ol>
+      <pre><code>0:00   Run 1: create lock ✅ → working...
+5:00   Run 2: create lock ❌ (exists, 5 min old) → skip
+8:00   Run 1: done → delete lock
+10:00  Run 3: create lock ✅ → working...</code></pre>
+      <div class="analogy">
+        <p>
+          A single key for a meeting room. Whoever has the key uses the room and returns it
+          after. Key missing = room busy. Key missing for 2 hours = someone forgot to return it,
+          so make a new one.
+        </p>
+      </div>
+      <p>
+        A file is used (not a variable like <code>isRunning = true</code>) because each cron run is a
+        separate program, and separate programs can't share variables. They can all see the same file.
+      </p>
+
+      <h3>Every lock works this way</h3>
+      <p>All locks have the same 3 parts: <strong>acquire</strong> (only one can succeed, in one step), <strong>release</strong>, and <strong>expiry</strong> (so a crash doesn't block forever). Only where the "key" lives changes:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Lock type</th><th>Where the key lives</th><th>Used for</th></tr></thead>
+          <tbody>
+            <tr><td>In-memory (mutex)</td><td>A variable in one program</td><td>Threads in the same program</td></tr>
+            <tr><td><strong>File lock (here)</strong></td><td>A file on disk</td><td>Separate programs on <strong>one</strong> server</td></tr>
+            <tr><td>Database lock</td><td>A row or flag in the DB</td><td>Many servers sharing a DB</td></tr>
+            <tr><td>Redis lock</td><td><code>SET key NX EX 7200</code></td><td>Many servers. The most common choice</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="callout-title">Only works on one machine</span>
+        <p>
+          The file lock works because everything is in one container. Workers on several servers
+          would each have their own disk and couldn't see each other's lock file. They'd need a
+          shared lock (Redis or the database), or a queue.
+        </p>
+      </div>
+
+      <h2 id="batch">Batches: 10 files, one at a time</h2>
+      <ul>
+        <li><code>runLoop</code> calls <code>processBatch(10)</code>. (<code>processBatch</code> has a default of 5, but it's never used, because 10 is always passed.)</li>
+        <li>Each run takes <strong>at most 10 files</strong>. Others wait for the next run.</li>
+        <li>Files are processed <strong>one by one</strong> in a normal <code>for</code> loop, never in parallel. Simpler, and safer on memory in a shared container. The downside: one slow PDF delays everything behind it.</li>
+        <li>If one file fails, the loop carries on with the next.</li>
+      </ul>
+      <p><strong>Example:</strong> 25 files uploaded at once.</p>
+      <pre><code>Run 1 (0 min):    files 1–10
+Run 2 (5 min):    files 11–20
+Run 3 (10 min):   files 21–25    → the last user waits 10–15 minutes</code></pre>
+      <p>
+        If a batch takes longer than 5 minutes, the next cron run hits the lock and skips. So the
+        best case is about 10 files every 5 minutes (~120 an hour). Fine for today's light usage.
+      </p>
+
+      <h2 id="internal">Talking to the database through the API</h2>
+      <p>The worker never connects to MySQL itself. It calls 2 internal routes on its own web server (same container, same repo):</p>
+      <pre><code>processVaultFiles.py  (worker)
+   │  GET http://localhost:8080/vault/internal/pending?limit=10
+   │  header  X-Internal-Key: &lt;secret&gt;
+   ▼
+gunicorn web server  →  routes/vaultRoutes.py  →  MySQL vaultFiles table
+   │
+   ▼
+list of pending files back to the worker</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Worker function</th><th>Route (in <code>vaultRoutes.py</code>)</th><th>Database effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>apiGetPending</code></td><td><code>GET /vault/internal/pending</code></td><td>Rows with status <code>pending</code>, or <code>processing</code> for over 30 minutes (stuck), oldest first</td></tr>
+            <tr><td><code>apiUpdateStatus</code></td><td><code>POST /vault/internal/update_status</code></td><td>processing: status only. completed: + <code>processedAt</code>, <code>chunkCount</code>, <code>indexS3Key</code>. error: + <code>errorMessage</code>, <code>processedAt</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The URL comes from <code>INTERNAL_API_URL</code> (default <code>http://localhost:8080</code>)
+        and the key from <code>INTERNAL_API_KEY</code>. <code>requests</code> is Python's
+        <code>axios</code>; both calls time out after 30 seconds.
+      </p>
+      <p><code>apiUpdateStatus</code> is called from 3 places in <code>processFile</code>: at the start (<code>processing</code>), at the end (<code>completed</code>), and on failure (<code>error</code>, message cut to 500 characters).</p>
+
+      <h2 id="processfile">processFile, step by step</h2>
+      <p>Input: one row from <code>vaultFiles</code> as a dictionary. Output: <code>True</code> or <code>False</code>.</p>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Unpack the row</span>
+          <span class="step-body"><code>fileId</code>, <code>userId</code>, <code>fileName</code>, <code>s3Key</code>, plus <code>holdingType</code> and <code>password</code> (always empty, see Gaps). <code>tmpPdfPath = None</code> so the cleanup can safely check it later.</span>
+        </li>
+        <li>
+          <span class="step-title">Mark "processing"</span>
+          <span class="step-body">The user sees work has started. If the worker crashes from here on, the file stays "processing", and after 30 minutes the next run picks it up again.</span>
+        </li>
+        <li>
+          <span class="step-title">Make the docName</span>
+          <span class="step-body"><code>vaultFile/42_1760345678123.pdf</code> → <code>42_1760345678123</code>. This is the document's unique ID in the RAG system.</span>
+        </li>
+        <li>
+          <span class="step-title">Download the PDF</span>
+          <span class="step-body">From S3 into memory, then written to a temp file, because the PDF libraries need a file path. <code>delete=False</code> keeps the file after it's closed; the <code>finally</code> deletes it at the end.</span>
+        </li>
+        <li>
+          <span class="step-title">Extract the text</span>
+          <span class="step-body"><code>extractPdfPageWise</code> → one text per page → numbered pages → drop empty pages → if none left, fail. Lesson 5.</span>
+        </li>
+        <li>
+          <span class="step-title">Index it</span>
+          <span class="step-body"><code>indexDocument</code>: chunk, embed, save to ChromaDB, back up to S3. Returns the chunk count. Lessons 6–8.</span>
+        </li>
+        <li>
+          <span class="step-title">Mark "completed"</span>
+          <span class="step-body">With <code>chunkCount</code> and <code>indexS3Key = "vaultFile/{docName}/"</code>. The file is now ready for chat. Return <code>True</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">On any error</span>
+          <span class="step-body">Mark "error" with the message, return <code>False</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">Always</span>
+          <span class="step-body">Delete the temp PDF.</span>
+        </li>
+      </ol>
+
+      <h2 id="gaps">Gaps</h2>
+      <div class="callout edge">
+        <span class="callout-title">Things that can go wrong</span>
+        <ul>
+          <li><strong>"No pending files" can be a lie.</strong> If <code>apiGetPending</code> can't reach the web server (say it's restarting), it logs the error and returns an empty list, so the next log line says "No pending files". Check for a connection error just above it.</li>
+          <li><strong>Failed status updates are ignored.</strong> If the "completed" update fails, the file is fully processed but stays "processing". After 30 minutes it's processed again.</li>
+          <li><strong><code>holdingType</code> and <code>password</code> are never fetched.</strong> The pending-files query doesn't select them. So the <code>pms</code> branch never runs, and password-protected PDFs always fail.</li>
+          <li><strong>Hard-coded fallback key.</strong> If <code>INTERNAL_API_KEY</code> isn't set, <code>core/config.py</code> falls back to a default key written in the source code. The internal routes are on the same public port as everything else, so anyone who has seen the code could change file statuses. Safer: refuse to start without the key.</li>
+          <li><strong>Outdated docstrings.</strong> The file's docstring mentions <code>process_vault_files.py</code> and options like <code>--batch-size</code> and <code>--loop</code> that don't exist. <code>processFile</code>'s docstring says "Textract OCR", which isn't used.</li>
+        </ul>
+      </div>
+
+      <h2 id="scale">When this stops being enough</h2>
+      <p>For today's light usage, cron + one worker is fine. Revisit when files pile up in "pending", users complain about the wait, or APIs slow down during processing. Then scale step by step:</p>
+      <ol class="steps">
+        <li><span class="step-title">Own container for the worker</span><span class="step-body">Same code, started differently. It can no longer slow down or crash the APIs.</span></li>
+        <li><span class="step-title">A queue instead of cron</span><span class="step-body">The upload puts "process file 123" on a queue (AWS SQS fits, since the project uses AWS). The worker starts immediately, with no 5-minute wait, gets automatic retries, and no longer needs the lock file.</span></li>
+        <li><span class="step-title">Many workers</span><span class="step-body">The queue hands out one file per worker, so 5 or 10 can run in parallel, with auto-scaling on queue length.</span></li>
+        <li><span class="step-title">Lighter processing</span><span class="step-body">Remove unused work (Camelot table scans), run embeddings on a GPU or through an API.</span></li>
+        <li><span class="step-title">A real vector database for chat</span><span class="step-body">pgvector, Qdrant or Pinecone, instead of one ChromaDB folder per document downloaded from S3.</span></li>
+      </ol>
+      <div class="callout">
+        <span class="callout-title">What about Inngest?</span>
+        <p>
+          Inngest is a manager for background jobs: it triggers functions on events, retries them
+          and shows every run in a dashboard. It doesn't run your code on its own servers; it calls
+          your function over HTTP, so the heavy work still runs on your server. It would give
+          instant processing and retries. Alternatives: Celery + Redis (classic Python), AWS SQS +
+          a worker, BullMQ (the Node.js equivalent).
+        </p>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="03-uploading-a-file.html"><small>← Previous</small><span>Uploading a file</span></a>
+        <a class="next" href="05-getting-text-out-of-a-pdf.html"><small>Next →</small><span>Getting text out of a PDF</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

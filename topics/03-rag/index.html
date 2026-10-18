@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Bootcamp</title>
+  <meta name="description" content="Chapter 3: notes from the Ultimate RAG Bootcamp course (LangChain, LangGraph, LangSmith).">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ RAG Bootcamp</span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html" aria-current="page">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Chapter 3</p>
+      <h1>RAG Bootcamp</h1>
+
+      <p class="lead">
+        Notes from the
+        <a href="https://www.udemy.com/course/ultimate-rag-bootcamp-using-langchainlanggraph-langsmith/">Ultimate RAG Bootcamp using LangChain, LangGraph &amp; LangSmith</a>
+        course on Udemy, written section by section as I go through it.
+      </p>
+
+      <div class="callout tip">
+        <span class="callout-title">New to some of the terms?</span>
+        <p>
+          <a href="background-concepts.html">Background concepts</a> explains terms the course
+          uses without explaining (LLM, tokens, agentic AI, LangChain, Groq, FAISS, …). It isn't
+          course content. Lessons link to it the first time a term comes up.
+        </p>
+      </div>
+
+      <h2>Lessons</h2>
+      <!-- Add a card per lesson as it is written -->
+      <h3>Section 1 · Introduction to RAG</h3>
+      <div class="cards">
+        <a class="card" href="01-introduction-to-rag.html">
+          <span class="card-num">Lesson 1</span>
+          <span class="card-title">Why RAG: the problem with LLMs</span>
+          <span class="card-desc">Training cut-off, private data and hallucination (the chef analogy), and RAG as an open-book exam.</span>
+        </a>
+        <a class="card" href="02-examples-and-advantages.html">
+          <span class="card-num">Lesson 2</span>
+          <span class="card-title">How RAG works</span>
+          <span class="card-desc">Tool vs knowledge base, then retrieval (similarity search), augmentation (metadata) and generation, and the full flow.</span>
+        </a>
+        <a class="card" href="03-business-impact.html">
+          <span class="card-num">Lesson 3</span>
+          <span class="card-title">RAG in the real world</span>
+          <span class="card-desc">Customer support with and without RAG, and reported results: JP Morgan, Microsoft Copilot, Bloomberg, healthcare, ROI.</span>
+        </a>
+        <a class="card" href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">
+          <span class="card-num">Lesson 4</span>
+          <span class="card-title">Prompt engineering vs fine-tuning vs RAG</span>
+          <span class="card-desc">What each changes (instructions, model, or what the model reads), pros and cons, best uses, and a side-by-side table.</span>
+        </a>
+      </div>
+
+      <h3>Section 2 · Core components of RAG</h3>
+      <div class="cards">
+        <a class="card" href="05-data-ingestion-and-preprocessing.html">
+          <span class="card-num">Lesson 5</span>
+          <span class="card-title">Data ingestion and preprocessing</span>
+          <span class="card-desc">The three core components, data sources, splitting into chunks and why (context size), embedding models, vector databases, and similarity search.</span>
+        </a>
+        <a class="card" href="06-query-processing-and-generation.html">
+          <span class="card-num">Lesson 6</span>
+          <span class="card-title">Query processing and generation</span>
+          <span class="card-desc">Embedding the query, searching for the most relevant chunks, augmenting them, what gets sent to the LLM, and the generation phase.</span>
+        </a>
+      </div>
+
+      <h3>Section 3 · Data Ingestion and Data Parsing Techniques</h3>
+      <div class="cards">
+        <a class="card" href="07-tools-and-section-overview.html">
+          <span class="card-num">Lesson 7</span>
+          <span class="card-title">The ingestion toolkit</span>
+          <span class="card-desc">Which library handles which RAG step, and a map of this section: source type → loader → lesson, all ending as Documents.</span>
+        </a>
+        <a class="card" href="08-langchain-document-structure.html">
+          <span class="card-num">Lesson 8</span>
+          <span class="card-title">LangChain document structure</span>
+          <span class="card-desc">Why all data becomes a Document, page_content and metadata, creating one by hand, why metadata matters, and document loaders.</span>
+        </a>
+        <a class="card" href="09-loading-text-files.html">
+          <span class="card-num">Lesson 9</span>
+          <span class="card-title">Loading text files</span>
+          <span class="card-desc">TextLoader for one file, what it returns, DirectoryLoader with glob, loader_cls and loader_kwargs for a folder, and its pros and cons.</span>
+        </a>
+        <a class="card" href="10-text-splitting.html">
+          <span class="card-num">Lesson 10</span>
+          <span class="card-title">Text splitting</span>
+          <span class="card-desc">chunk_size, chunk_overlap and separators; Character, RecursiveCharacter and Token splitters; when overlap appears; which to use.</span>
+        </a>
+        <a class="card" href="11-loading-pdf-files.html">
+          <span class="card-num">Lesson 11</span>
+          <span class="card-title">Loading PDF files</span>
+          <span class="card-desc">PyPDFLoader and PyMuPDFLoader, one Document per page, the rich PDF metadata, and which loader to pick.</span>
+        </a>
+        <a class="card" href="12-handling-pdf-issues.html">
+          <span class="card-num">Lesson 12</span>
+          <span class="card-title">Handling PDF issues</span>
+          <span class="card-desc">Common PDF problems, cleaning whitespace and ligatures, and a SmartPDFProcessor class that cleans, skips empty pages, chunks and enriches metadata.</span>
+        </a>
+        <a class="card" href="13-loading-word-documents.html">
+          <span class="card-num">Lesson 13</span>
+          <span class="card-title">Loading Word documents</span>
+          <span class="card-desc">Docx2txtLoader (one Document) vs UnstructuredWordDocumentLoader in elements mode (titles, paragraphs and tables as separate Documents).</span>
+        </a>
+        <a class="card" href="14-loading-csv-and-excel.html">
+          <span class="card-num">Lesson 14</span>
+          <span class="card-title">Loading CSV and Excel</span>
+          <span class="card-desc">Structured data: CSVLoader (one row, one Document), custom CSV processing with rich metadata, and Excel via pandas or UnstructuredExcelLoader.</span>
+        </a>
+        <a class="card" href="15-loading-json.html">
+          <span class="card-num">Lesson 15</span>
+          <span class="card-title">Loading JSON</span>
+          <span class="card-desc">JSONLoader with a jq_schema to pick one Document per record, custom processing that flattens nested JSON into readable text, and an assignment.</span>
+        </a>
+        <a class="card" href="16-loading-sql-databases.html">
+          <span class="card-num">Lesson 16</span>
+          <span class="card-title">Loading SQL databases</span>
+          <span class="card-desc">Inspecting a database with SQLDatabase, one Document per table, and relationship Documents built from a JOIN.</span>
+        </a>
+      </div>
+
+      <h3>Section 4 · Vector Embeddings and Vector Databases</h3>
+      <div class="cards">
+        <a class="card" href="17-introduction-to-embeddings-and-vector-databases.html">
+          <span class="card-num">Lesson 17</span>
+          <span class="card-title">Embeddings and vector databases</span>
+          <span class="card-desc">Exact match vs similar-meaning search, what an embedding is, vectors as feature representations (the Iron Man example), and cosine similarity.</span>
+        </a>
+        <a class="card" href="18-visualizing-embeddings-and-cosine-similarity.html">
+          <span class="card-num">Lesson 18</span>
+          <span class="card-title">Visualizing embeddings and cosine similarity</span>
+          <span class="card-desc">Embedding dimensions per model, plotting word vectors in 2D to see clusters, a NumPy cosine similarity function, and reading its −1 to 1 result.</span>
+        </a>
+        <a class="card" href="19-hugging-face-embeddings.html">
+          <span class="card-num">Lesson 19</span>
+          <span class="card-title">Creating embeddings with Hugging Face</span>
+          <span class="card-desc">Finding models on Hugging Face, HuggingFaceEmbeddings with all-MiniLM-L6-v2, embed_query vs embed_documents, and a comparison of sentence-transformers models.</span>
+        </a>
+        <a class="card" href="20-openai-embeddings.html">
+          <span class="card-num">Lesson 20</span>
+          <span class="card-title">OpenAI embeddings</span>
+          <span class="card-desc">API key, credits and .env setup, OpenAIEmbeddings with text-embedding-3-small (1,536 dimensions), and comparing 3-small, 3-large and ada-002.</span>
+        </a>
+        <a class="card" href="21-similarity-and-semantic-search.html">
+          <span class="card-num">Lesson 21</span>
+          <span class="card-title">Similarity and semantic search</span>
+          <span class="card-desc">Scoring every pair of sentences with OpenAI embeddings and cosine similarity, then a semantic_search function that returns the top-k documents for a query.</span>
+        </a>
+      </div>
+
+      <h3>Section 5 · Vector Stores and Vector Databases</h3>
+      <div class="cards">
+        <a class="card" href="22-vector-stores-vs-vector-databases.html">
+          <span class="card-num">Lesson 22</span>
+          <span class="card-title">Vector stores vs vector databases</span>
+          <span class="card-desc">Lightweight in-memory library vs full distributed database: functionality, architecture, scale, cost, speed, popular examples, and when to use which.</span>
+        </a>
+        <a class="card" href="23-chromadb-rag-part-1.html">
+          <span class="card-num">Lesson 23</span>
+          <span class="card-title">RAG with ChromaDB, part 1: load, split, embed</span>
+          <span class="card-desc">What ChromaDB is, the eight steps of a RAG pipeline, and the first ones in code: sample data, DirectoryLoader, RecursiveCharacterTextSplitter, OpenAIEmbeddings.</span>
+        </a>
+        <a class="card" href="24-chromadb-rag-part-2.html">
+          <span class="card-num">Lesson 24</span>
+          <span class="card-title">RAG with ChromaDB, part 2: store and search</span>
+          <span class="card-desc">Chroma.from_documents with a persist directory and collection, similarity_search, and why Chroma's scores (L2 distance) are lower for better matches.</span>
+        </a>
+        <a class="card" href="25-chromadb-rag-part-3.html">
+          <span class="card-num">Lesson 25</span>
+          <span class="card-title">RAG with ChromaDB, part 3: the LLM and the retrieval chain</span>
+          <span class="card-desc">ChatOpenAI and init_chat_model, as_retriever, a system prompt with {context}, create_stuff_documents_chain and create_retrieval_chain, and invoking the finished RAG chain.</span>
+        </a>
+        <a class="card" href="26-rag-with-lcel.html">
+          <span class="card-num">Lesson 26</span>
+          <span class="card-title">Building the RAG chain with LCEL</span>
+          <span class="card-desc">The same pipeline without helper functions: the pipe operator, RunnablePassthrough, format_docs and StrOutputParser, and how it compares to the built-in chain.</span>
+        </a>
+        <a class="card" href="27-adding-documents-to-a-vector-store.html">
+          <span class="card-num">Lesson 27</span>
+          <span class="card-title">Adding new documents to a vector store</span>
+          <span class="card-desc">Wrapping new text in a Document with metadata, splitting it, add_documents into the existing Chroma store, and querying the updated store with the same chain.</span>
+        </a>
+        <a class="card" href="28-conversational-memory.html">
+          <span class="card-num">Lesson 28</span>
+          <span class="card-title">Conversational memory</span>
+          <span class="card-desc">Why follow-up questions fail, create_history_aware_retriever, MessagesPlaceholder for chat history, and keeping the history with HumanMessage and AIMessage.</span>
+        </a>
+        <a class="card" href="29-using-groq-llms.html">
+          <span class="card-num">Lesson 29</span>
+          <span class="card-title">Using Groq LLMs</span>
+          <span class="card-desc">Free Groq API keys, loading GROQ_API_KEY, and creating the LLM with ChatGroq or init_chat_model("groq:...").</span>
+        </a>
+        <a class="card" href="30-faiss-rag-part-1.html">
+          <span class="card-num">Lesson 30</span>
+          <span class="card-title">RAG with FAISS, part 1: the vector store</span>
+          <span class="card-desc">What FAISS is, building the store with from_documents, save_local and load_local, similarity search with scores, and metadata filtering.</span>
+        </a>
+        <a class="card" href="31-faiss-rag-part-2.html">
+          <span class="card-num">Lesson 31</span>
+          <span class="card-title">RAG with FAISS, part 2: three RAG chains</span>
+          <span class="card-desc">With a Groq LLM and LCEL: a simple chain, a conversational chain using RunnablePassthrough.assign and chat history, and a streaming chain with .stream().</span>
+        </a>
+        <a class="card" href="32-inmemory-vector-store.html">
+          <span class="card-num">Lesson 32</span>
+          <span class="card-title">InMemoryVectorStore</span>
+          <span class="card-desc">LangChain's built-in dictionary-and-NumPy vector store: add_documents, similarity search, function filters, and as_retriever.</span>
+        </a>
+        <a class="card" href="33-datastax-astra-db.html">
+          <span class="card-num">Lesson 33</span>
+          <span class="card-title">DataStax Astra DB</span>
+          <span class="card-desc">A full cloud vector database: creating a serverless vector database, endpoint and token, AstraDBVectorStore, filtered and scored search, score-threshold retrievers.</span>
+        </a>
+        <a class="card" href="34-pinecone.html">
+          <span class="card-num">Lesson 34</span>
+          <span class="card-title">Pinecone</span>
+          <span class="card-desc">Creating a Pinecone index, the Pinecone client and ServerlessSpec, matching embedding dimensions, PineconeVectorStore, and a comparison with Astra DB.</span>
+        </a>
+      </div>
+
+      <h3>Section 6 · Advanced Chunking and Preprocessing Techniques</h3>
+      <div class="cards">
+        <a class="card" href="35-semantic-chunking.html">
+          <span class="card-num">Lesson 35</span>
+          <span class="card-title">Semantic chunking</span>
+          <span class="card-desc">Why size-based splitting breaks related sentences apart, and how semantic chunking groups them: segment, embed, compare neighbours, merge above a threshold.</span>
+        </a>
+        <a class="card" href="36-semantic-chunking-in-python.html">
+          <span class="card-num">Lesson 36</span>
+          <span class="card-title">Semantic chunking in Python</span>
+          <span class="card-desc">The algorithm from scratch with SentenceTransformer, scikit-learn's cosine_similarity and a 0.7 threshold, and how five sentences become four chunks.</span>
+        </a>
+        <a class="card" href="37-rag-with-a-semantic-chunker.html">
+          <span class="card-num">Lesson 37</span>
+          <span class="card-title">RAG pipeline with a semantic chunker</span>
+          <span class="card-desc">Semantic chunking as a reusable ThresholdSemanticChunker class, then FAISS, a Groq LLM and an LCEL chain with RunnableMap on its chunks.</span>
+        </a>
+        <a class="card" href="38-semanticchunker-in-langchain.html">
+          <span class="card-num">Lesson 38</span>
+          <span class="card-title">LangChain's SemanticChunker</span>
+          <span class="card-desc">The built-in SemanticChunker from langchain-experimental: one embedding model, split_documents, and how it compares to the custom class.</span>
+        </a>
+      </div>
+
+      <h3>Section 7 · Hybrid Search Strategies</h3>
+      <div class="cards">
+        <a class="card" href="39-dense-and-sparse-retrieval.html">
+          <span class="card-num">Lesson 39</span>
+          <span class="card-title">Hybrid search: dense and sparse retrieval</span>
+          <span class="card-desc">Sparse retrieval (exact keywords with TF-IDF or BM25) vs dense retrieval (meaning with embeddings), the weighted hybrid score, and a worked example.</span>
+        </a>
+        <a class="card" href="40-hybrid-retriever-in-langchain.html">
+          <span class="card-num">Lesson 40</span>
+          <span class="card-title">Hybrid retriever in LangChain</span>
+          <span class="card-desc">A FAISS dense retriever plus a BM25Retriever, combined with EnsembleRetriever and 0.7/0.3 weights, then a full RAG chain on top.</span>
+        </a>
+        <a class="card" href="41-benefits-of-hybrid-search.html">
+          <span class="card-num">Lesson 41</span>
+          <span class="card-title">Benefits of hybrid search</span>
+          <span class="card-desc">Recall, synonyms, robustness, rare-term importance, mixed documents, tunable weights and typo tolerance, plus the use cases where hybrid search pays off.</span>
+        </a>
+        <a class="card" href="42-reranking.html">
+          <span class="card-num">Lesson 42</span>
+          <span class="card-title">Reranking</span>
+          <span class="card-desc">A second stage between retrieval and generation: a fast retriever fetches top-k, then a cross-encoder or LLM reorders them by relevance to the query.</span>
+        </a>
+        <a class="card" href="43-reranking-with-an-llm.html">
+          <span class="card-num">Lesson 43</span>
+          <span class="card-title">Reranking with an LLM</span>
+          <span class="card-desc">FAISS retrieval, a ranking prompt for a Groq LLM, parsing the returned indices safely, and reordering the documents.</span>
+        </a>
+        <a class="card" href="44-maximal-marginal-relevance.html">
+          <span class="card-num">Lesson 44</span>
+          <span class="card-title">Maximal marginal relevance (MMR)</span>
+          <span class="card-desc">Retrieving documents that are relevant but not redundant: the MMR formula, the λ trade-off, and a step-by-step worked example.</span>
+        </a>
+        <a class="card" href="45-mmr-retriever.html">
+          <span class="card-num">Lesson 45</span>
+          <span class="card-title">MMR retriever in LangChain</span>
+          <span class="card-desc">search_type="mmr" on a FAISS store, tuning with fetch_k and lambda_mult, and the MMR retriever in a create_retrieval_chain pipeline.</span>
+        </a>
+        <a class="card" href="46-when-to-use-mmr.html">
+          <span class="card-num">Lesson 46</span>
+          <span class="card-title">When to use MMR</span>
+          <span class="card-desc">Where MMR helps and where to skip it, the FAQ-chatbot interview question, and how hybrid search, reranking and MMR fix different problems.</span>
+        </a>
+      </div>
+
+      <h3>Section 8 · Query Enhancement</h3>
+      <div class="cards">
+        <a class="card" href="47-query-expansion.html">
+          <span class="card-num">Lesson 47</span>
+          <span class="card-title">Query expansion</span>
+          <span class="card-desc">Why the query decides retrieval quality, what query expansion is and when to use it, and the prompt + LLM step it adds before the retriever.</span>
+        </a>
+        <a class="card" href="48-query-expansion-in-code.html">
+          <span class="card-num">Lesson 48</span>
+          <span class="card-title">Query expansion in code</span>
+          <span class="card-desc">A query expansion chain, an MMR retriever on FAISS, and a RAG pipeline that retrieves with the expanded query but answers the original one.</span>
+        </a>
+        <a class="card" href="49-query-decomposition.html">
+          <span class="card-num">Lesson 49</span>
+          <span class="card-title">Query decomposition</span>
+          <span class="card-desc">Splitting a complex question into sub-questions, retrieving and answering each, synthesizing the answers, the cost in LLM calls, and a full implementation.</span>
+        </a>
+        <a class="card" href="50-hyde.html">
+          <span class="card-num">Lesson 50</span>
+          <span class="card-title">HyDE: hypothetical document embeddings</span>
+          <span class="card-desc">Searching with an LLM-written hypothetical answer: the idea, a manual version on Wikipedia data, and LangChain's HypotheticalDocumentEmbedder.</span>
+        </a>
+      </div>
+
+      <h3>Section 9 · Multimodal RAG</h3>
+      <div class="cards">
+        <a class="card" href="51-multimodal-rag.html">
+          <span class="card-num">Lesson 51</span>
+          <span class="card-title">Multimodal RAG</span>
+          <span class="card-desc">RAG over text and images: multimodal LLMs, CLIP for shared text-image embeddings, and the full pipeline from PDF to answer.</span>
+        </a>
+        <a class="card" href="52-multimodal-rag-in-code.html">
+          <span class="card-num">Lesson 52</span>
+          <span class="card-title">Multimodal RAG in code</span>
+          <span class="card-desc">PyMuPDF extraction, CLIP embedding functions, FAISS.from_embeddings, vector search, and a GPT-4.1 message with text and base64 images.</span>
+        </a>
+      </div>
+
+      <h3>Section 10 · Getting Started with AI Agents and Agentic AI</h3>
+      <div class="cards">
+        <a class="card" href="53-ai-agents-vs-agentic-ai.html">
+          <span class="card-num">Lesson 53</span>
+          <span class="card-title">AI agents vs agentic AI</span>
+          <span class="card-desc">One program doing one task vs a network of agents pursuing a larger goal: definitions, key differences, perception → reasoning → action → learning, and examples.</span>
+        </a>
+        <a class="card" href="54-agentic-ai-software-team-example.html">
+          <span class="card-num">Lesson 54</span>
+          <span class="card-title">Agentic AI example: a software team</span>
+          <span class="card-desc">Turning the requirements → development → testing → code review workflow into communicating AI agents, why humans stay in the loop, and a blog generation example.</span>
+        </a>
+      </div>
+
+      <h3>Section 11 · Updated LangChain Hands-On (v1)</h3>
+      <div class="cards">
+        <a class="card" href="55-langchain-v1-create-agent.html">
+          <span class="card-num">Lesson 55</span>
+          <span class="card-title">LangChain v1: creating agents</span>
+          <span class="card-desc">What changed in LangChain v1, what makes an app an agent, and create_agent with a model, a function tool and a system prompt, invoked with messages.</span>
+        </a>
+        <a class="card" href="56-invoke-stream-batch.html">
+          <span class="card-num">Lesson 56</span>
+          <span class="card-title">Invoke, stream and batch</span>
+          <span class="card-desc">Waiting for the full answer, streaming chunks as they're generated, and sending many independent requests in parallel with max_concurrency.</span>
+        </a>
+        <a class="card" href="57-tools-in-langchain.html">
+          <span class="card-num">Lesson 57</span>
+          <span class="card-title">Tools in LangChain</span>
+          <span class="card-desc">The @tool decorator, bind_tools, reading tool calls, the manual tool execution loop, and how it compares to create_agent.</span>
+        </a>
+        <a class="card" href="58-message-types.html">
+          <span class="card-num">Lesson 58</span>
+          <span class="card-title">Message types</span>
+          <span class="card-desc">Text prompts vs message prompts, system/human/AI/tool messages, short vs detailed system prompts, metadata, conversation history and token usage.</span>
+        </a>
+        <a class="card" href="59-structured-output-pydantic.html">
+          <span class="card-num">Lesson 59</span>
+          <span class="card-title">Structured output with Pydantic</span>
+          <span class="card-desc">with_structured_output and Pydantic models: typed fields with descriptions, validation, include_raw, and nested structures.</span>
+        </a>
+        <a class="card" href="60-structured-output-typeddict.html">
+          <span class="card-num">Lesson 60</span>
+          <span class="card-title">Structured output with TypedDict</span>
+          <span class="card-desc">TypedDict and Annotated as a validation-free alternative to Pydantic, nested TypedDicts, and checking model capabilities with model.profile.</span>
+        </a>
+        <a class="card" href="61-structured-output-dataclasses.html">
+          <span class="card-num">Lesson 61</span>
+          <span class="card-title">Structured output with dataclasses and agents</span>
+          <span class="card-desc">create_agent's response_format with a Pydantic model, a TypedDict and a dataclass, and a comparison of the three schema types.</span>
+        </a>
+        <a class="card" href="62-middleware-summarization.html">
+          <span class="card-num">Lesson 62</span>
+          <span class="card-title">Middleware and summarization</span>
+          <span class="card-desc">What middleware is (the airport analogy), hooks in the agent loop, the built-in list, and SummarizationMiddleware triggered by messages, tokens or a fraction of the context window.</span>
+        </a>
+        <a class="card" href="63-human-in-the-loop-middleware.html">
+          <span class="card-num">Lesson 63</span>
+          <span class="card-title">Human-in-the-loop middleware</span>
+          <span class="card-desc">Pausing an email agent before it sends: interrupt_on, allowed decisions, __interrupt__, and resuming with Command to approve, reject or edit.</span>
+        </a>
+      </div>
+
+      <h2>Glossary</h2>
+      <dl class="glossary">
+        <!-- Add terms as they come up: <dt>Term</dt><dd>Meaning</dd> -->
+        <dt>RAG</dt>
+        <dd>Retrieval-Augmented Generation: the AI looks up relevant information from an external source, enriches it, and uses it as context to generate its answer.</dd>
+
+        <dt>LLM</dt>
+        <dd>Large Language Model. Knows only what was in its training data, up to the date that data ends.</dd>
+
+        <dt>Retrieval</dt>
+        <dd>Fetching the content that matches the user's query from the vector database.</dd>
+
+        <dt>Augmentation</dt>
+        <dd>Enriching the retrieved content with metadata (source, date, …) before giving it to the LLM.</dd>
+
+        <dt>Generation</dt>
+        <dd>The LLM producing the output (often a summary) from the context it was given.</dd>
+
+        <dt>Context</dt>
+        <dd>The retrieved (and enriched) information handed to the LLM along with the question.</dd>
+
+        <dt>Vector database</dt>
+        <dd>A database that stores data (text, images, media, video) in the form of vectors (lists of numbers). Where the knowledge for RAG is kept.</dd>
+
+        <dt>Similarity search</dt>
+        <dd>How retrieval finds matching content in the vector database, using similarity metrics.</dd>
+
+        <dt>Metadata</dt>
+        <dd>Extra information attached to a piece of text, such as its source, page, author and date. In LangChain, a Document's <code>metadata</code> dictionary. Used for filtering, tracking sources, context and auditing.</dd>
+
+        <dt>Hallucination</dt>
+        <dd>When an LLM doesn't know something (it wasn't trained on that data) but guesses and makes up an answer anyway.</dd>
+
+        <dt>Text embeddings</dt>
+        <dd>Vectors (numbers) that represent text. Created by an embedding model and stored in a vector database.</dd>
+
+        <dt>ROI</dt>
+        <dd>Return on investment: how much value you get back for what you spend. Around 312% on average for RAG, per the course.</dd>
+
+        <dt>Source attribution</dt>
+        <dd>Every answer points to the source it came from. Important for compliance.</dd>
+
+        <dt>Base LLM</dt>
+        <dd>An LLM as it comes, e.g. GPT-4, Llama 3 or Gemini, before any fine-tuning.</dd>
+
+        <dt>Prompt engineering</dt>
+        <dd>Giving the base LLM structured instructions with clear context so it behaves a certain way. The model itself doesn't change.</dd>
+
+        <dt>Fine-tuning</dt>
+        <dd>Training a base LLM on new (e.g. company) data so its weights change permanently, creating a specialized model.</dd>
+
+        <dt>Weights</dt>
+        <dd>The model's internal parameters. Fine-tuning modifies them; prompting and RAG don't.</dd>
+
+        <dt>Token limit</dt>
+        <dd>The maximum amount of text a model can handle, which limits how complex a prompt can be.</dd>
+
+        <dt>Context window</dt>
+        <dd>How much context an LLM can take in at once. Limits how much retrieved content RAG can pass it. Varies by model.</dd>
+
+        <dt>Proprietary data</dt>
+        <dd>A company's private data. RAG can use it because it's stored in the company's own databases.</dd>
+
+        <dt>RAG pipeline</dt>
+        <dd>The full RAG system. Three core components: document ingestion, query processing, and generation.</dd>
+
+        <dt>Data ingestion pipeline</dt>
+        <dd>Reads data from its sources (PDF, CSV, websites, …), preprocesses it, and stores it in the vector database.</dd>
+
+        <dt>Chunk</dt>
+        <dd>A smaller part of a document. Data is split into chunks before being embedded.</dd>
+
+        <dt>Text splitter / document splitter</dt>
+        <dd>What divides documents into chunks.</dd>
+
+        <dt>Context size</dt>
+        <dd>How much content an LLM can take in as context. Differs per model; the reason data is chunked.</dd>
+
+        <dt>Embedding model</dt>
+        <dd>A model that converts text into vectors, e.g. from OpenAI or Hugging Face.</dd>
+
+        <dt>Cosine similarity / Euclidean distance</dt>
+        <dd>Techniques for finding stored vectors similar to the query's, i.e. similar text.</dd>
+
+        <dt>FAISS, ChromaDB, DataStax, Pinecone</dt>
+        <dd>Vector databases used in the course. Pinecone is one of the most commonly used.</dd>
+
+        <dt>Query processing phase</dt>
+        <dd>Embed the user's query, search the vector database for the most relevant chunks, and enrich them with metadata.</dd>
+
+        <dt>Retrieved results</dt>
+        <dd>The chunks of documents the search returns as the best match for the query. They become the LLM's context.</dd>
+
+        <dt>Generation phase</dt>
+        <dd>The original query plus the enriched context go to an LLM, which returns a summarised answer to the user.</dd>
+
+        <dt>Groq</dt>
+        <dd>A provider of many open-source LLMs, including Llama.</dd>
+
+        <dt>Parsing</dt>
+        <dd>Reading a file (PDF, Word, JSON, website, …) and getting its content out so it can be chunked.</dd>
+
+        <dt>LangChain</dt>
+        <dd>The Python library the course builds RAG pipelines with. Its <em>integrations</em> connect to many data sources.</dd>
+
+        <dt>LangGraph</dt>
+        <dd>A companion library to LangChain, also used in the course.</dd>
+
+        <dt>sentence-transformers</dt>
+        <dd>A library that converts text into vectors.</dd>
+
+        <dt>Document (LangChain)</dt>
+        <dd>The structure LangChain converts all loaded data into. Has two parts: <code>page_content</code> and <code>metadata</code>.</dd>
+
+        <dt>page_content</dt>
+        <dd>A Document's actual text, as a string. This is what gets embedded and searched.</dd>
+
+        <dt>Document loader</dt>
+        <dd>A LangChain library that reads a file (PDF, text, …) and returns Document objects.</dd>
+
+        <dt>Text splitters</dt>
+        <dd>LangChain classes that divide documents into chunks: <code>RecursiveCharacterTextSplitter</code>, <code>CharacterTextSplitter</code>, <code>TokenTextSplitter</code>.</dd>
+
+        <dt>TextLoader</dt>
+        <dd>LangChain loader that reads one text file into a list with one Document. Adds <code>source</code> (the file path) to metadata.</dd>
+
+        <dt>DirectoryLoader</dt>
+        <dd>LangChain loader that finds all matching files in a folder (via a glob pattern) and loads each with the loader class you give it.</dd>
+
+        <dt>glob</dt>
+        <dd>A file-matching pattern, e.g. <code>**/*.txt</code> = every .txt file in the folder and its sub-folders.</dd>
+
+        <dt>chunk_size / chunk_overlap</dt>
+        <dd>A splitter's maximum chunk size, and how much of one chunk may repeat at the start of the next.</dd>
+
+        <dt>Separator</dt>
+        <dd>Where a splitter is allowed to cut: e.g. <code>"\n\n"</code> (paragraphs), <code>"\n"</code> (lines), <code>" "</code> (words), <code>""</code> (characters).</dd>
+
+        <dt>RecursiveCharacterTextSplitter</dt>
+        <dd>Tries a list of separators in order (paragraphs → lines → words → characters). The recommended default splitter.</dd>
+
+        <dt>split_text / split_documents</dt>
+        <dd>Splitter methods: the first takes a string and returns strings; the second takes Documents and returns Documents (keeping metadata).</dd>
+
+        <dt>PyPDFLoader</dt>
+        <dd>LangChain's common PDF loader. Returns one Document per page, with the page number and PDF info in metadata.</dd>
+
+        <dt>PyMuPDFLoader</dt>
+        <dd>A faster PDF loader with better text extraction and image support. Needs the <code>pymupdf</code> package.</dd>
+
+        <dt>Ligature</dt>
+        <dd>A single character that stands for two letters, like <code>ﬁ</code> for "fi". Common in PDFs; breaks search unless replaced.</dd>
+
+        <dt>create_documents</dt>
+        <dd>Splitter method that splits texts into chunks and returns them as Documents, attaching the given metadata to every chunk.</dd>
+
+        <dt>Docx2txtLoader</dt>
+        <dd>LangChain loader that reads a Word file as plain text into one Document.</dd>
+
+        <dt>UnstructuredWordDocumentLoader</dt>
+        <dd>LangChain loader for Word files. With <code>mode="elements"</code>, returns one Document per structural element (title, paragraph, table), labelled in <code>metadata['category']</code>.</dd>
+
+        <dt>CSVLoader</dt>
+        <dd>LangChain loader that turns every CSV row into its own Document, with <code>row</code> in metadata.</dd>
+
+        <dt>UnstructuredExcelLoader</dt>
+        <dd>LangChain loader for Excel built on Unstructured. Handles complex Excel features; slow.</dd>
+
+        <dt>JSONLoader</dt>
+        <dd>LangChain loader for JSON. A <code>jq_schema</code> picks which part becomes Documents, e.g. <code>.employees[]</code> = one per employee.</dd>
+
+        <dt>jq_schema</dt>
+        <dd>A jq query passed to JSONLoader that selects records from the JSON.</dd>
+
+        <dt>SQLDatabase</dt>
+        <dd>LangChain utility that connects to a SQL database and shows its tables, DDL and sample rows. Doesn't produce Documents.</dd>
+
+        <dt>Relationship Document</dt>
+        <dd>A Document built from a JOIN across tables, so linked facts (e.g. who leads which project) are stored together.</dd>
+
+        <dt>Third-party tool</dt>
+        <dd>An external service the LLM can call, e.g. a web search API, to get information it wasn't trained on.</dd>
+
+        <dt>Embedding</dt>
+        <dd>A technique that turns text into a vector (a list of numbers) so a model can work with it. Similar meanings get similar vectors.</dd>
+
+        <dt>Exact match</dt>
+        <dd>How a traditional database (SQL, MySQL, NoSQL) searches: only records that match the condition exactly come back.</dd>
+
+        <dt>Feature representation</dt>
+        <dd>Another name for a vector representation: each number says how strongly the text relates to some feature (e.g. action, comedy, suspense).</dd>
+
+        <dt>Cosine similarity (formula)</dt>
+        <dd><code>(A · B) / (‖A‖ × ‖B‖)</code>: the dot product of two vectors divided by the product of their magnitudes. Higher means more similar.</dd>
+
+        <dt>Dimensions</dt>
+        <dd>How many numbers an embedding model puts in each vector, e.g. around 1,500 for an OpenAI model or 384 for a Hugging Face one. The dimensions have no names.</dd>
+
+        <dt>Cosine similarity (result)</dt>
+        <dd>Close to 1 = very similar, close to 0 = not related, close to −1 = opposite.</dd>
+
+        <dt>PCA</dt>
+        <dd>Principal component analysis: a dimensionality reduction technique that lets high-dimensional embeddings be plotted in 2D.</dd>
+
+        <dt>HuggingFaceEmbeddings</dt>
+        <dd>LangChain class (from <code>langchain_huggingface</code>) that loads any Hugging Face embedding model by its <code>model_name</code>. No API key needed.</dd>
+
+        <dt>all-MiniLM-L6-v2</dt>
+        <dd>A small, fast sentence-transformers model that turns a sentence into a 384-dimension vector. The course's default Hugging Face embedding model.</dd>
+
+        <dt>Sentence transformer</dt>
+        <dd>An embedding model that converts a whole sentence (or chunk) into one vector, rather than one vector per word.</dd>
+
+        <dt>embed_query / embed_documents</dt>
+        <dd>Embedding methods: the first takes one string and returns one vector; the second takes a list of strings and returns a list of vectors.</dd>
+
+        <dt>Semantic search</dt>
+        <dd>Searching by meaning rather than exact words. What embeddings stored in a vector database are used for.</dd>
+
+        <dt>OpenAIEmbeddings</dt>
+        <dd>LangChain class (from <code>langchain_openai</code>) that calls OpenAI's embedding models. Needs <code>OPENAI_API_KEY</code> set.</dd>
+
+        <dt>text-embedding-3-small / 3-large</dt>
+        <dd>OpenAI embedding models. 3-small: 1,536 dimensions, $0.02 per 1M tokens, general purpose. 3-large: 3,072 dimensions, $0.13 per 1M tokens, highest quality.</dd>
+
+        <dt>text-embedding-ada-002</dt>
+        <dd>OpenAI's previous-generation embedding model. For legacy applications; not recommended for new work.</dd>
+
+        <dt>.env / load_dotenv</dt>
+        <dd>A file that holds secrets like <code>OPENAI_API_KEY</code>, and the <code>python-dotenv</code> function that loads them into the program.</dd>
+
+        <dt>top_k</dt>
+        <dd>How many of the best-matching results a search returns, e.g. the top 3 documents by similarity score.</dd>
+
+        <dt>Vector store</dt>
+        <dd>A lightweight library or tool for storing and searching vectors, running in memory or from a local file. Simple k-nearest-neighbour search; best for prototypes under ~1 million vectors. E.g. FAISS, Chroma.</dd>
+
+        <dt>Vector database (vs store)</dt>
+        <dd>A fully featured, distributed database system for vector data at scale (billions of vectors), with filters, metadata queries and CRUD. E.g. Pinecone, Qdrant, Milvus.</dd>
+
+        <dt>k nearest neighbours</dt>
+        <dd>The k stored vectors closest to a query vector. What a vector store's similarity search returns.</dd>
+
+        <dt>CRUD</dt>
+        <dd>Create, read, update, delete: the full set of database operations a vector database supports on its records.</dd>
+
+        <dt>ChromaDB</dt>
+        <dd>An open-source search and retrieval database for AI applications. Run locally, the course uses it as a vector store.</dd>
+
+        <dt>Chroma.from_documents</dt>
+        <dd>Creates a Chroma vector store from a list of Documents: embeds each chunk with the given embedding model and stores it in a named collection.</dd>
+
+        <dt>persist_directory</dt>
+        <dd>The local folder where Chroma saves the vector store, e.g. <code>./chroma_db</code>.</dd>
+
+        <dt>Collection</dt>
+        <dd>A named set of vectors inside Chroma (e.g. <code>rag_collection</code>); effectively the vector store's name.</dd>
+
+        <dt>similarity_search / similarity_search_with_score</dt>
+        <dd>Vector store methods that return the top k chunks most similar to a text query; the second also returns each chunk's score.</dd>
+
+        <dt>L2 (Euclidean) distance</dt>
+        <dd>Chroma's default score. A distance: lower = more similar, 0 = identical, typically 0 to 2.</dd>
+
+        <dt>Context augmentation</dt>
+        <dd>The pipeline step that combines the retrieved chunks with the query as context for the LLM.</dd>
+
+        <dt>ChatOpenAI</dt>
+        <dd>LangChain class (from <code>langchain_openai</code>) for OpenAI chat models, e.g. <code>ChatOpenAI(model="gpt-3.5-turbo", temperature=0.2, max_tokens=500)</code>.</dd>
+
+        <dt>init_chat_model</dt>
+        <dd>Creates a chat model for any provider from a <code>"provider:model"</code> string, e.g. <code>"openai:gpt-3.5-turbo"</code> or <code>"groq:…"</code>.</dd>
+
+        <dt>invoke</dt>
+        <dd>The method that runs a model or chain on an input. Replaces the deprecated <code>predict</code>.</dd>
+
+        <dt>Retriever / as_retriever</dt>
+        <dd>An interface to a vector store that only retrieves relevant chunks. <code>vectorstore.as_retriever(search_kwargs={"k": 3})</code> creates one; needed to put a store into a chain.</dd>
+
+        <dt>ChatPromptTemplate</dt>
+        <dd>A prompt with placeholders like <code>{context}</code> and <code>{input}</code>, built from messages (<code>from_messages</code>) or one template string (<code>from_template</code>).</dd>
+
+        <dt>System prompt</dt>
+        <dd>The instruction message that tells the LLM how to behave, e.g. "answer from the retrieved context; if you don't know, say so".</dd>
+
+        <dt>create_stuff_documents_chain</dt>
+        <dd>Built-in chain that stuffs all retrieved chunks into the prompt's <code>{context}</code>, sends it to the LLM and returns the response.</dd>
+
+        <dt>create_retrieval_chain</dt>
+        <dd>Built-in chain that puts a retriever in front of a document chain. Invoked with <code>{"input": ...}</code>; returns input, context and answer.</dd>
+
+        <dt>LCEL</dt>
+        <dd>LangChain Expression Language: building a chain by connecting steps with the <code>|</code> (pipe) symbol, without helper functions.</dd>
+
+        <dt>RunnablePassthrough / RunnableParallel</dt>
+        <dd>LCEL building blocks: the first passes its input through unchanged (e.g. the question); the second runs stages in parallel.</dd>
+
+        <dt>StrOutputParser</dt>
+        <dd>The last step of a chain that returns the LLM's reply as a plain string.</dd>
+
+        <dt>add_documents</dt>
+        <dd>Vector store method that embeds new chunks with the store's embedding model and adds them to an existing store.</dd>
+
+        <dt>Conversational memory</dt>
+        <dd>Passing the previous conversation (chat history) into a RAG chain so follow-up questions like "What are its types?" are understood.</dd>
+
+        <dt>Standalone question</dt>
+        <dd>A question rewritten so it makes sense without the chat history, e.g. "its types" → the types of machine learning.</dd>
+
+        <dt>create_history_aware_retriever</dt>
+        <dd>Wraps a retriever so the LLM first rewrites the latest question into a standalone one using the chat history, then searches with it.</dd>
+
+        <dt>MessagesPlaceholder</dt>
+        <dd>A slot in a <code>ChatPromptTemplate</code> where a list of messages (the chat history) is inserted.</dd>
+
+        <dt>HumanMessage / AIMessage</dt>
+        <dd>Message objects for the chat history: the user's question and the LLM's answer.</dd>
+
+        <dt>ChatGroq</dt>
+        <dd>LangChain class (from <code>langchain_groq</code>) for models hosted on Groq. Needs <code>GROQ_API_KEY</code>.</dd>
+
+        <dt>FAISS (in code)</dt>
+        <dd>LangChain's <code>FAISS</code> vector store (needs the <code>faiss-cpu</code> package). Built with <code>FAISS.from_documents</code>; <code>index.ntotal</code> counts its vectors.</dd>
+
+        <dt>save_local / load_local</dt>
+        <dd>Save a FAISS store to a folder, and load it back (with the same embeddings and <code>allow_dangerous_deserialization=True</code>).</dd>
+
+        <dt>Metadata filter</dt>
+        <dd>A <code>filter={"key": "value"}</code> argument to a search that only considers chunks whose metadata matches.</dd>
+
+        <dt>search_type</dt>
+        <dd>An <code>as_retriever</code> option choosing how the retriever searches; <code>"similarity"</code> is plain similarity search.</dd>
+
+        <dt>RunnablePassthrough.assign</dt>
+        <dd>Passes a dictionary through a chain and adds a new key to it, e.g. <code>context</code> computed from <code>x["input"]</code>.</dd>
+
+        <dt>Streaming / .stream()</dt>
+        <dd>Getting the LLM's answer in pieces as it's generated, instead of all at once with <code>.invoke()</code>.</dd>
+
+        <dt>InMemoryVectorStore</dt>
+        <dd>LangChain's built-in vector store (<code>langchain_core.vectorstores</code>): vectors in a dictionary, cosine similarity with NumPy. Lost when the program stops.</dd>
+
+        <dt>Astra DB / AstraDBVectorStore</dt>
+        <dd>DataStax's serverless cloud vector database, and its LangChain class (<code>langchain-astradb</code>). Connects with an API endpoint and application token.</dd>
+
+        <dt>Pinecone index / PineconeVectorStore</dt>
+        <dd>A vector database in Pinecone is called an index. <code>PineconeVectorStore(index, embedding)</code> (<code>langchain-pinecone</code>) wraps it as a LangChain vector store.</dd>
+
+        <dt>dimensions (OpenAIEmbeddings)</dt>
+        <dd>Shortens <code>text-embedding-3</code> vectors, e.g. <code>dimensions=1024</code>. Must match the vector database's dimension.</dd>
+
+        <dt>similarity_score_threshold</dt>
+        <dd>A retriever <code>search_type</code> that only returns results scoring at least <code>score_threshold</code>.</dd>
+
+        <dt>Semantic chunking</dt>
+        <dd>Splitting documents into chunks based on semantic similarity rather than size: adjacent sentences that are similar enough are merged into one chunk.</dd>
+
+        <dt>Document segmentation</dt>
+        <dd>The first step of semantic chunking: breaking a document into sentences or paragraphs.</dd>
+
+        <dt>Similarity threshold</dt>
+        <dd>The minimum similarity for two adjacent sentences to be merged into the same chunk (e.g. 0.7). Higher = tighter chunks.</dd>
+
+        <dt>SentenceTransformer.encode</dt>
+        <dd>Embeds a list of sentences with a sentence-transformers model directly, e.g. <code>SentenceTransformer("all-MiniLM-L6-v2").encode(sentences)</code>.</dd>
+
+        <dt>Modular coding</dt>
+        <dd>Organising code into classes and methods (e.g. <code>__init__</code>, <code>split</code>, <code>split_documents</code>) so it can be reused and configured.</dd>
+
+        <dt>RunnableMap</dt>
+        <dd>Another name for <code>RunnableParallel</code>: builds a dictionary of inputs (e.g. <code>context</code> and <code>question</code>) for the next step of a chain.</dd>
+
+        <dt>PromptTemplate</dt>
+        <dd>A single-string prompt with placeholders, e.g. <code>PromptTemplate.from_template("... {context} ... {question}")</code>.</dd>
+
+        <dt>SemanticChunker</dt>
+        <dd>LangChain's built-in semantic chunking (<code>langchain_experimental.text_splitter</code>). Takes an embedding model; uses a default threshold.</dd>
+
+        <dt>Hybrid search</dt>
+        <dd>Combining exact keyword search (sparse) with semantic search (dense) to retrieve more accurate context.</dd>
+
+        <dt>Sparse retrieval</dt>
+        <dd>Retrieval by exact keyword match, using sparse vectors from bag of words, TF-IDF or BM25.</dd>
+
+        <dt>Dense retrieval</dt>
+        <dd>Retrieval by meaning, using embeddings and cosine similarity.</dd>
+
+        <dt>TF-IDF / BM25</dt>
+        <dd>Keyword-scoring techniques that turn text into sparse vectors; a document scores higher when it contains the query's (rarer) words.</dd>
+
+        <dt>Hybrid score / α</dt>
+        <dd><code>α × score_dense + (1 − α) × score_sparse</code>. α sets the weight; 0.5 = equal weight.</dd>
+
+        <dt>BM25Retriever</dt>
+        <dd>LangChain's local BM25 keyword retriever (<code>langchain_community.retrievers</code>, needs <code>rank_bm25</code>). Built with <code>from_documents</code>; <code>.k</code> sets top-k.</dd>
+
+        <dt>EnsembleRetriever</dt>
+        <dd>Combines several retrievers into one with <code>weights</code>, e.g. dense 0.7 + sparse 0.3. Merges results by weighted rank.</dd>
+
+        <dt>Recall</dt>
+        <dd>How many of the relevant documents a search actually finds. Hybrid search boosts it because each side catches what the other misses.</dd>
+
+        <dt>Reranking</dt>
+        <dd>A second-stage step after retrieval: a slower, more accurate model rescores and reorders the top-k documents by relevance to the query.</dd>
+
+        <dt>Cross-encoder</dt>
+        <dd>A model that reads the query and a document together and outputs a relevance score. Accurate but slow, so used for reranking a few documents.</dd>
+
+        <dt>LLM reranker</dt>
+        <dd>Reranking by prompting an LLM with the question and numbered documents and asking for the documents' order.</dd>
+
+        <dt>MMR (maximal marginal relevance)</dt>
+        <dd>A diversity-aware retrieval technique: picks documents relevant to the query but not redundant with those already picked. <code>λ × sim(d, q) − (1 − λ) × max sim(d, selected)</code>.</dd>
+
+        <dt>λ (lambda, in MMR)</dt>
+        <dd>The relevance/diversity trade-off in MMR. 0.7 = 70% relevance, 30% diversity; 1 = plain similarity search.</dd>
+
+        <dt>search_type="mmr"</dt>
+        <dd>The <code>as_retriever</code> option that makes a retriever select documents with MMR instead of plain similarity.</dd>
+
+        <dt>fetch_k / lambda_mult</dt>
+        <dd>MMR retriever settings: how many similar candidates to fetch first (default 20), and λ (default 0.5).</dd>
+
+        <dt>Precision vs coverage</dt>
+        <dd>Getting only the most exact matches vs covering several aspects of a question. MMR favours coverage.</dd>
+
+        <dt>Query enhancement</dt>
+        <dd>Techniques that improve the user's query before retrieval, so better context is retrieved.</dd>
+
+        <dt>Query expansion</dt>
+        <dd>Reformulating a short or vague query with synonyms, technical terms and context, usually with a prompt + LLM chain. The expanded query is used for retrieval.</dd>
+
+        <dt>Knowledge base</dt>
+        <dd>The collection the retriever searches: in RAG, the vector store or vector database.</dd>
+
+        <dt>Query decomposition</dt>
+        <dd>Breaking a complex, multi-part question into simple sub-questions, each retrieved and answered separately, then combined.</dd>
+
+        <dt>Decomposer / synthesizer</dt>
+        <dd>In query decomposition: the step that splits the question (LLM + prompt, or regex), and the step that combines the sub-answers.</dd>
+
+        <dt>HyDE</dt>
+        <dd>Hypothetical Document Embeddings: an LLM writes a hypothetical answer to the query, and that answer's embedding is used to search the vector store.</dd>
+
+        <dt>HypotheticalDocumentEmbedder</dt>
+        <dd>LangChain's HyDE as an embedding function (<code>langchain.chains.hyde.base</code>). <code>from_llm(llm, base_embeddings, prompt_key=... or custom_prompt=...)</code>.</dd>
+
+        <dt>WikipediaLoader</dt>
+        <dd>Document loader that fetches Wikipedia articles for a search query, e.g. <code>WikipediaLoader(query="Steve Jobs", load_max_docs=5)</code>. Needs the <code>wikipedia</code> package.</dd>
+
+        <dt>Multimodal RAG</dt>
+        <dd>RAG over more than one kind of data, here text and images (e.g. charts inside PDFs).</dd>
+
+        <dt>Multimodal LLM</dt>
+        <dd>An LLM trained on both text and images, so it can answer questions about images, e.g. GPT-4.1, Gemini 2.5 Flash.</dd>
+
+        <dt>CLIP</dt>
+        <dd>Contrastive Language–Image Pre-training: an OpenAI model that embeds text and images into the same vector space (512 dimensions for <code>clip-vit-base-patch32</code>).</dd>
+
+        <dt>PyMuPDF (fitz)</dt>
+        <dd>A fast PDF library that extracts text (<code>page.get_text()</code>) and images (<code>page.get_images()</code>, <code>doc.extract_image()</code>).</dd>
+
+        <dt>FAISS.from_embeddings</dt>
+        <dd>Builds a FAISS store from precomputed (text, vector) pairs instead of embedding the text itself.</dd>
+
+        <dt>similarity_search_by_vector</dt>
+        <dd>Searches a vector store with a vector you provide, e.g. a CLIP-embedded query.</dd>
+
+        <dt>AI agent</dt>
+        <dd>An individual software program that performs a specific task with a degree of autonomy, following predefined rules. E.g. a customer service chatbot.</dd>
+
+        <dt>Agentic AI</dt>
+        <dd>A system where multiple AI agents collaborate and make decisions independently towards a larger goal, adapting from real-time data. E.g. a smart home system.</dd>
+
+        <dt>Perception, reasoning, action, learning</dt>
+        <dd>The four steps behind an agentic system's decisions: gather data, understand it, act on it, improve over time.</dd>
+
+        <dt>Human feedback in the loop</dt>
+        <dd>Keeping a person involved to review or correct an agentic workflow; a LangGraph concept covered later.</dd>
+
+        <dt>create_agent</dt>
+        <dd>LangChain v1's one-call way to build an agent: <code>create_agent(model, tools, system_prompt)</code>. Invoked with <code>{"messages": [...]}</code>.</dd>
+
+        <dt>Tool (agent)</dt>
+        <dd>A function the agent's LLM can decide to call, e.g. a weather lookup. Its name, parameters and docstring tell the LLM when to use it.</dd>
+
+        <dt>Training cut-off</dt>
+        <dd>The date an LLM's training data ends. Anything newer (today's news, live weather) needs a tool.</dd>
+
+        <dt>Tool call / tool message</dt>
+        <dd>An AI message in which the model asks to run a tool with certain arguments, and the message carrying the tool's result back to the model.</dd>
+
+        <dt>model.stream</dt>
+        <dd>Returns an iterator of output chunks while the model is still generating; print <code>chunk.text</code> with <code>end=""</code>, <code>flush=True</code>.</dd>
+
+        <dt>model.batch / max_concurrency</dt>
+        <dd>Sends a list of independent requests in parallel and returns a list of answers. <code>config={"max_concurrency": n}</code> caps how many run at once.</dd>
+
+        <dt>@tool</dt>
+        <dd>Decorator (<code>langchain.tools</code>) that turns a Python function into a LangChain tool, using its name, arguments and docstring as the schema.</dd>
+
+        <dt>bind_tools</dt>
+        <dd>Attaches tools to a model so it can request them (<code>response.tool_calls</code>). It doesn't run them.</dd>
+
+        <dt>Tool execution loop</dt>
+        <dd>Invoke the model → run each tool call → append the tool messages → invoke again for the final answer.</dd>
+
+        <dt>Text prompt vs message prompt</dt>
+        <dd>A plain string for a single standalone request, vs a list of message objects carrying instructions and conversation history.</dd>
+
+        <dt>SystemMessage / ToolMessage</dt>
+        <dd>The instruction telling the model how to behave, and the message carrying a tool's output (its <code>tool_call_id</code> matches the tool call's <code>id</code>).</dd>
+
+        <dt>usage_metadata</dt>
+        <dd>A response field with the input, output and total token counts of a model call.</dd>
+
+        <dt>Structured output</dt>
+        <dd>Making a model answer in a format matching a given schema (Pydantic, TypedDict or dataclass) so it's easy to parse and reuse.</dd>
+
+        <dt>with_structured_output</dt>
+        <dd><code>model.with_structured_output(Schema)</code>: returns a model whose responses are schema objects. <code>include_raw=True</code> also returns the raw message.</dd>
+
+        <dt>BaseModel / Field (Pydantic)</dt>
+        <dd>The base class for Pydantic schemas, and the helper that adds a description (and other settings) to each field.</dd>
+
+        <dt>TypedDict / Annotated</dt>
+        <dd>A schema type from Python's typing with no runtime validation (results are plain dicts). <code>Annotated[type, ..., "description"]</code> adds a description to a field.</dd>
+
+        <dt>model.profile</dt>
+        <dd>A chat model's capabilities: max input/output tokens, image/audio/video input, reasoning output, tool calling.</dd>
+
+        <dt>Dataclass</dt>
+        <dd>A Python class for holding data, made with <code>@dataclass</code>; no validation. Usable as a structured-output schema.</dd>
+
+        <dt>response_format / structured_response</dt>
+        <dd><code>create_agent(..., response_format=Schema)</code> makes the agent's final answer follow a schema; it's returned in <code>result["structured_response"]</code>.</dd>
+
+        <dt>Middleware</dt>
+        <dd>Code that runs at hooks inside an agent (before/after the agent or model, around tool calls) for logging, limits, retries, guardrails, summarization and more. Passed as <code>create_agent(..., middleware=[...])</code>.</dd>
+
+        <dt>Hook</dt>
+        <dd>A trigger point in the agent's loop where middleware can run.</dd>
+
+        <dt>SummarizationMiddleware</dt>
+        <dd>Built-in middleware that summarizes older conversation history when a <code>trigger</code> is reached, keeping recent messages per <code>keep</code>. Counts in messages, tokens or a fraction of the context window.</dd>
+
+        <dt>Checkpointer / thread_id</dt>
+        <dd>Saves an agent's conversation between calls (e.g. <code>InMemorySaver()</code>); <code>config={"configurable": {"thread_id": ...}}</code> picks which conversation.</dd>
+
+        <dt>HumanInTheLoopMiddleware</dt>
+        <dd>Pauses the agent before chosen tool calls for a human decision. <code>interrupt_on={"tool": {"allowed_decisions": ["approve", "edit", "reject"]}}</code>.</dd>
+
+        <dt>__interrupt__</dt>
+        <dd>Key in an agent's result when it has paused and is waiting for a human decision.</dd>
+
+        <dt>Command(resume=...)</dt>
+        <dd>From <code>langgraph.types</code>: resumes a paused agent with the human's decision, e.g. <code>Command(resume={"decisions": [{"type": "approve"}]})</code>, using the same thread_id.</dd>
+      </dl>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a class="next" href="01-introduction-to-rag.html"><small>Start</small><span>Why RAG: the problem with LLMs</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

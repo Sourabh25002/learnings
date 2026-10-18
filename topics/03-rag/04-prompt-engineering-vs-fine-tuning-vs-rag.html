@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompting, Fine-Tuning, RAG</title>
+  <meta name="description" content="How prompt engineering, fine-tuning and RAG each work, their pros and cons, and when to use which.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html" aria-current="page">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 1 · Lesson 4</p>
+      <h1>Prompt Engineering vs Fine-Tuning vs RAG</h1>
+
+      <p class="lead">
+        Three ways to make an LLM do what you need. Prompting changes the
+        <em>instructions</em>, fine-tuning changes the <em>model</em>, RAG changes what the model
+        gets to <em>read</em>.
+      </p>
+
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 290" role="img" aria-label="Three flows: prompt engineering, fine-tuning and RAG">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+
+            <text x="0" y="18" class="d-text d-label-accent">Prompt engineering: instruct the model</text>
+            <rect x="0" y="30" width="200" height="46" rx="8" class="d-box"/>
+            <text x="100" y="51" text-anchor="middle" class="d-small">Prompt + input</text>
+            <text x="100" y="66" text-anchor="middle" class="d-muted">"act as a chef…"</text>
+            <line x1="200" y1="53" x2="278" y2="53" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="280" y="30" width="200" height="46" rx="8" class="d-box accent"/>
+            <text x="380" y="51" text-anchor="middle" class="d-small">Base LLM</text>
+            <text x="380" y="66" text-anchor="middle" class="d-muted">unchanged</text>
+            <line x1="480" y1="53" x2="558" y2="53" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="560" y="30" width="200" height="46" rx="8" class="d-box ok"/>
+            <text x="660" y="58" text-anchor="middle" class="d-small">Customized output</text>
+
+            <text x="0" y="118" class="d-text d-label-accent">Fine-tuning: teach the model through training</text>
+            <rect x="0" y="130" width="160" height="46" rx="8" class="d-box"/>
+            <text x="80" y="151" text-anchor="middle" class="d-small">New training data</text>
+            <text x="80" y="166" text-anchor="middle" class="d-muted">company data</text>
+            <line x1="160" y1="153" x2="198" y2="153" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="200" y="130" width="160" height="46" rx="8" class="d-box accent"/>
+            <text x="280" y="158" text-anchor="middle" class="d-small">Train base LLM</text>
+            <line x1="360" y1="153" x2="398" y2="153" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="400" y="130" width="160" height="46" rx="8" class="d-box accent"/>
+            <text x="480" y="151" text-anchor="middle" class="d-small">Weights modified</text>
+            <text x="480" y="166" text-anchor="middle" class="d-muted">permanently</text>
+            <line x1="560" y1="153" x2="598" y2="153" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="600" y="130" width="160" height="46" rx="8" class="d-box ok"/>
+            <text x="680" y="151" text-anchor="middle" class="d-small">Fine-tuned LLM</text>
+            <text x="680" y="166" text-anchor="middle" class="d-muted">specialized</text>
+
+            <text x="0" y="218" class="d-text d-label-accent">RAG: teach the model through retrieval</text>
+            <rect x="0" y="230" width="136" height="46" rx="8" class="d-box"/>
+            <text x="68" y="258" text-anchor="middle" class="d-small">User query</text>
+            <line x1="136" y1="253" x2="154" y2="253" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="156" y="230" width="136" height="46" rx="8" class="d-box accent"/>
+            <text x="224" y="251" text-anchor="middle" class="d-small">Retrieve docs</text>
+            <text x="224" y="266" text-anchor="middle" class="d-muted">knowledge base</text>
+            <line x1="292" y1="253" x2="310" y2="253" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="312" y="230" width="136" height="46" rx="8" class="d-box accent"/>
+            <text x="380" y="258" text-anchor="middle" class="d-small">Augment</text>
+            <line x1="448" y1="253" x2="466" y2="253" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="468" y="230" width="136" height="46" rx="8" class="d-box accent"/>
+            <text x="536" y="251" text-anchor="middle" class="d-small">Generate</text>
+            <text x="536" y="266" text-anchor="middle" class="d-muted">base LLM</text>
+            <line x1="604" y1="253" x2="622" y2="253" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="624" y="230" width="136" height="46" rx="8" class="d-box ok"/>
+            <text x="692" y="258" text-anchor="middle" class="d-small">Response</text>
+          </svg>
+        </div>
+        <figcaption>Prompting changes the instructions, fine-tuning changes the model, RAG changes what the model gets to read.</figcaption>
+      </figure>
+
+      <h2 id="prompt">Prompt engineering</h2>
+      <p class="keyidea">Giving a <strong>base LLM</strong> (a model as it comes, e.g. <a href="background-concepts.html#providers" title="Background concepts">GPT-4, Llama 3 or Gemini</a>) a <strong>prompt</strong> (instructions) so it behaves the way you want.</p>
+      <div class="split">
+        <div><h4>Prompt (instruction)</h4><pre><code>Act as a chef and provide me a recipe.</code></pre></div>
+        <div><h4>Input (question)</h4><pre><code>Please tell me how to prepare pizza.</code></pre></div>
+      </div>
+      <p>
+        The LLM answers like a chef: a customised output. The prompt must be clear and structured.
+        The model itself doesn't change: its <a href="background-concepts.html#parameters" title="Background concepts">parameters</a> (the internal numbers
+        it learned in training) stay untouched.
+      </p>
+      <div class="split">
+        <div>
+          <h4 class="yes">Pros</h4>
+          <ul>
+            <li>No technical expertise: plain English</li>
+            <li>Instant results</li>
+            <li>No training cost</li>
+            <li>Works with any LLM</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="no">Cons</h4>
+          <ul>
+            <li>Limited to the model's own knowledge; can't add new knowledge</li>
+            <li><strong>Inconsistent</strong>: change the prompt or the model and results change (the biggest con)</li>
+            <li><a href="background-concepts.html#token" title="Background concepts">Token</a> limits (a cap on how much text the model handles) restrict complexity</li>
+          </ul>
+        </div>
+      </div>
+      <p><strong>Best for</strong>: small apps, generic tasks, quick prototypes. Not company-specific assistants.</p>
+
+      <h2 id="fine-tuning">Fine-tuning</h2>
+      <p class="keyidea">Training the base LLM on new data (e.g. the company's), so its <strong>weights</strong> (its parameters) change permanently and it becomes a specialised model.</p>
+      <p>Example: a company assistant that should always greet and behave in the company's own way:</p>
+      <pre><code>Hi, welcome to XYZ company. How may I help you?</code></pre>
+      <ol class="steps">
+        <li><span class="step-title">Prepare data</span><span class="step-body">Domain-specific training data, e.g. the company's.</span></li>
+        <li><span class="step-title">Train</span><span class="step-body">Train the base LLM on it; the weights change.</span></li>
+        <li><span class="step-title">Specialised model</span><span class="step-body">A fine-tuned LLM that keeps the new behaviour.</span></li>
+      </ol>
+      <div class="split">
+        <div>
+          <h4 class="yes">Pros</h4>
+          <ul>
+            <li>Deep, domain-specific knowledge (e.g. a legal expert)</li>
+            <li>Consistent behaviour; no prompting needed</li>
+            <li>Learns new styles and behaviours</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="no">Cons</h4>
+          <ul>
+            <li>Expensive: needs <a href="background-concepts.html#gpu" title="Background concepts">GPUs</a></li>
+            <li>Needs ML/AI expertise</li>
+            <li>Must be retrained to update</li>
+          </ul>
+        </div>
+      </div>
+      <p><strong>Best for</strong>: a specific style, high-volume consistent tasks, critical accuracy. (Techniques like <a href="background-concepts.html#lora" title="Background concepts">LoRA and QLoRA</a> exist; the course doesn't cover them.)</p>
+
+      <h2 id="rag">RAG</h2>
+      <p class="keyidea">Teaching the model through <strong>retrieval</strong>: the base LLM stays as it is; for each query, relevant documents are retrieved from an external knowledge source, augmented and used to answer.</p>
+      <p>
+        The knowledge source is usually a vector database (local or in the cloud), but can be an
+        <a href="background-concepts.html#in-memory-db" title="Background concepts">in-memory database</a>, APIs or plain documents.
+      </p>
+      <div class="split">
+        <div>
+          <h4 class="yes">Pros</h4>
+          <ul>
+            <li>Up to date: just keep the data current</li>
+            <li>No training, so cost-effective</li>
+            <li>High accuracy (slightly below fine-tuning, improving as techniques improve)</li>
+            <li>Works with private data in your own databases</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="no">Cons</h4>
+          <ul>
+            <li>Needs infrastructure: a vector database and everything around it</li>
+            <li>Answers depend on retrieval quality</li>
+            <li><strong>Context window</strong> (how much text the LLM can read at once) caps how much can be retrieved</li>
+          </ul>
+        </div>
+      </div>
+      <p><strong>Best for</strong>: most use cases, e.g. customer support and real-time or company data.</p>
+
+      <h2 id="compare">Side by side</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Prompt engineering</th><th>Fine-tuning</th><th>RAG</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Idea</strong></td><td>Instruct the LLM</td><td>Teach it by training</td><td>Teach it by retrieval</td></tr>
+            <tr><td><strong>Model changes?</strong></td><td>No</td><td>Yes, permanently</td><td>No</td></tr>
+            <tr><td><strong>New knowledge?</strong></td><td>No</td><td>Yes, via training</td><td>Yes, from the knowledge base</td></tr>
+            <tr><td><strong>Up to date?</strong></td><td>No</td><td>Only after retraining</td><td>Yes</td></tr>
+            <tr><td><strong>Cost</strong></td><td>Free</td><td>Expensive</td><td>Moderate (infrastructure)</td></tr>
+            <tr><td><strong>Accuracy</strong></td><td>Inconsistent</td><td>Highest, consistent</td><td>High, depends on retrieval</td></tr>
+            <tr><td><strong>Main limit</strong></td><td>Token limit, generic</td><td>Cost, retraining</td><td>Context window, retrieval quality</td></tr>
+            <tr><td><strong>Best for</strong></td><td>Small apps, prototypes</td><td>Style, high-volume, critical accuracy</td><td>Support, real-time and company data</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="03-business-impact.html"><small>← Previous</small><span>RAG in the real world</span></a>
+        <a class="next" href="05-data-ingestion-and-preprocessing.html"><small>Next →</small><span>Data ingestion and preprocessing</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

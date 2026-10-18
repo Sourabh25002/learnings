@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting text out of a PDF</title>
+  <meta name="description" content="PDFs vs text files, digital vs scanned, OCR and Textract, and how extractPdfPageWise pulls text from each page.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">Document Vault (RAG)</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>Document Vault (RAG)</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li><a href="01-what-is-the-doc-vault.html">What is the Document Vault?</a></li>
+        <li><a href="02-how-the-backend-is-organized.html">How the backend is organized</a></li>
+        <li><a href="03-uploading-a-file.html">Uploading a file</a></li>
+        <li><a href="04-the-background-worker.html">The background worker</a></li>
+        <li><a href="05-getting-text-out-of-a-pdf.html" aria-current="page">Getting text out of a PDF</a></li>
+        <li><a href="06-chunking.html">Chunking</a></li>
+        <li><a href="07-embeddings.html">Embeddings</a></li>
+        <li><a href="08-vector-database.html">Storing vectors: ChromaDB and S3</a></li>
+        <li><a href="09-finding-relevant-chunks.html">Finding the right pieces: search and reranking</a></li>
+        <li><a href="10-generating-the-answer.html">Generating the answer with Gemini</a></li>
+        <li><a href="11-deleting-and-cleanup.html">Deleting files and cleanup</a></li>
+        <li><a href="12-gaps-and-improvements.html">Known gaps and improvements</a></li>
+        <li><a href="13-interview-questions.html">Interview questions &amp; answers</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Lesson 5</p>
+      <h1>Getting text out of a PDF</h1>
+
+      <p class="lead">
+        Before anything can be searched, the PDF has to become plain text. In the Vault this is
+        done by <code>extractPdfPageWise</code> in <code>services/documentOcr.py</code>, using
+        free Python libraries. It works for digital PDFs and silently fails on scanned ones.
+      </p>
+
+      <div class="toc">
+        <strong>In this lesson</strong>
+        <ol>
+          <li><a href="#pdf-vs-txt">Why a PDF isn't like a .txt file</a></li>
+          <li><a href="#two-kinds">Digital vs scanned PDFs</a></li>
+          <li><a href="#ocr">OCR and Textract</a></li>
+          <li><a href="#libraries">The libraries we use</a></li>
+          <li><a href="#function">extractPdfPageWise, step by step</a></li>
+          <li><a href="#example">A worked example</a></li>
+          <li><a href="#worker">Back in the worker</a></li>
+          <li><a href="#holdings">How asset-holdings uploads differ</a></li>
+          <li><a href="#limits">Limits and bugs</a></li>
+        </ol>
+      </div>
+
+      <h2 id="pdf-vs-txt">Why a PDF isn't like a .txt file</h2>
+      <div class="split">
+        <div>
+          <h4>.txt file</h4>
+          <p>Contains exactly what you see, in reading order. If it shows <code>Hello</code>, the file holds those 5 letters.</p>
+        </div>
+        <div>
+          <h4>.pdf file</h4>
+          <p>Contains <strong>drawing instructions</strong>, often compressed:</p>
+          <pre><code>use font Arial, size 12
+draw "Amount:" at (300, 120)
+draw "Account" at (50, 40)
+draw "50000"   at (380, 120)
+draw a line from here to here</code></pre>
+        </div>
+      </div>
+      <p>
+        A PDF viewer reads these instructions and draws the page for you. What you see is the
+        result, not the file's contents. (Open a PDF in VS Code to see: <code>obj</code>,
+        <code>stream</code>, <code>/Font</code> and lots of gibberish.)
+      </p>
+      <div class="analogy">
+        <p>A .txt file is a letter: you just read it. A PDF is a blueprint: someone has to build the page before you can see it.</p>
+      </div>
+      <p>
+        So a library extracting text has to <strong>rebuild</strong> it: work out which words are
+        on the same line, the reading order, where spaces go, and how to handle columns, tables,
+        headers and footers. That's where extraction goes wrong sometimes. For us it's one line of
+        code; the library does the hard part.
+      </p>
+
+      <h2 id="two-kinds">Digital vs scanned PDFs</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kind</th><th>How it was made</th><th>Text stored inside?</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Digital PDF</strong></td><td>Exported from software: bank statements, broker contract notes, Word → PDF</td><td class="yes">Yes. Every word, with its position</td></tr>
+            <tr><td><strong>Scanned PDF</strong></td><td>A scan or photo of paper</td><td class="no">No. Each page is just an image</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="keyidea">The Vault assumes digital PDFs. It reads text that's already stored in the file. Tables are text too in a digital PDF; they're not images.</p>
+
+      <h2 id="ocr">OCR and Textract</h2>
+      <p>
+        <strong>OCR = Optical Character Recognition</strong>: reading text from an <em>image</em> by
+        recognising letter shapes. Optical (it looks), Character (letters, numbers, symbols),
+        Recognition (works out what they are). Everyday examples: Google Lens, phone document
+        scanners, apps reading a credit card number through the camera.
+      </p>
+      <p>
+        <strong>AWS Textract</strong> is Amazon's OCR service in the cloud. You send a PDF or image
+        and get text back. It also understands layout: tables as rows and columns, form fields as
+        "label: value" pairs, even handwriting. It's paid per page.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>pdfplumber (used now)</th><th>AWS Textract (not used)</th></tr></thead>
+          <tbody>
+            <tr><td>Cost</td><td>Free</td><td>Paid per page</td></tr>
+            <tr><td>Digital PDFs</td><td class="yes">Works</td><td class="yes">Works</td></tr>
+            <tr><td>Scanned PDFs, photos</td><td class="no">Gets nothing</td><td class="yes">Works</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="callout-title">Watch out: "OCR" in the code isn't OCR</span>
+        <p>
+          The code, comments and logs say "OCR" everywhere ("Running OCR on...",
+          <code>documentOcr.py</code>). The team used Textract earlier, then switched to free
+          libraries, and the names stayed. Textract code still exists (in
+          <code>documentOcr.py</code>, <code>rag/textractOcr.py</code> and the <code>textract/</code>
+          folder) but nothing calls it. In an interview, say "we extract text with pdfplumber",
+          not "we run OCR".
+        </p>
+      </div>
+
+      <h2 id="libraries">The libraries we use</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Module</th><th>What it is</th><th>Job here</th></tr></thead>
+          <tbody>
+            <tr><td><strong>pdfplumber</strong></td><td>PDF text reader (like <code>pdf-parse</code>)</td><td>⭐ Reads each page's text: <code>page.extract_text()</code></td></tr>
+            <tr><td><strong>fitz</strong> (PyMuPDF)</td><td>Fast all-round PDF tool</td><td>Opens the PDF, checks for a password, saves an unlocked copy</td></tr>
+            <tr><td><strong>camelot</strong></td><td>Table finder</td><td>Finds tables (result unused by the Vault)</td></tr>
+            <tr><td><strong>pandas</strong></td><td>Data tables, like Excel in code</td><td>Holds Camelot's tables while they're cleaned</td></tr>
+            <tr><td><code>tempfile</code>, <code>re</code></td><td>Built into Python</td><td>Temp files; tidying blank lines</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>boto3</code> (AWS SDK) and <code>pdf2image</code> are imported in the same file but only used by the old Textract functions.</p>
+      <p>
+        We don't need to know how these libraries read a PDF internally, the same way we use
+        <code>axios</code> without knowing how HTTP works underneath. What matters is: which one
+        does what, what goes in and out, the limits, and our own rules on top.
+      </p>
+
+      <h2 id="function">extractPdfPageWise, step by step</h2>
+      <p>Inputs: <code>pdfPath</code>, <code>password</code> (always <code>""</code> from the Vault), <code>fromApi</code> (output format; the Vault passes <code>True</code>), <code>progressCallback</code> (<code>None</code>), <code>returnPerPage</code> (<code>False</code>).</p>
+      <ol class="steps">
+        <li>
+          <span class="step-title">Password check (PyMuPDF)</span>
+          <span class="step-body">Locked with no password → error "This PDF is password protected...". Wrong password → "Invalid password." Right password → save an unlocked copy to a temp file, because Camelot and pdfplumber handle passwords badly.</span>
+        </li>
+        <li>
+          <span class="step-title">Find tables (Camelot, two scans)</span>
+          <span class="step-body">"Lattice" finds tables with grid lines; kept if Camelot is at least 70% confident. "Stream" finds tables aligned by spacing only; kept at 60%+. Results are grouped by page, each with its position on the page.</span>
+        </li>
+        <li>
+          <span class="step-title">Remove duplicate tables</span>
+          <span class="step-body">If a stream table overlaps a lattice table by over 50%, it's the same table; the lattice one is kept.</span>
+        </li>
+        <li>
+          <span class="step-title">For each page (pdfplumber)</span>
+          <span class="step-body">Read the text. If it contains "annexure a", skip the whole page. Collect the page's tables (dropping ones with 2 or fewer columns). Read the text again (same result). Save it labelled: <code>"\n--- Page 3 ---\n" + text</code>.</span>
+        </li>
+        <li>
+          <span class="step-title">Return</span>
+          <span class="step-body">With <code>fromApi=True</code>: <code>(list of page texts, list of tables)</code>. Other formats exist for other callers (all pages joined into one string, or per-page dictionaries for <code>/ocr</code>).</span>
+        </li>
+      </ol>
+
+      <h3>Camelot's confidence score</h3>
+      <p>
+        For every table, Camelot reports an <code>accuracy</code> score (0–100): how cleanly the
+        text fit into the rows and columns it detected. Camelot returns everything; the 70/60
+        filter is the team's choice. Too high misses real but messy tables; too low keeps junk
+        (addresses or two-column paragraphs mistaken for tables). Stream is given a lower bar
+        because line-less tables naturally score lower. There's no official right number: you
+        test on real PDFs and pick one that separates real tables from junk.
+      </p>
+
+      <h2 id="example">A worked example</h2>
+      <p>A one-page bank statement, as a person sees it:</p>
+      <pre><code>┌─────────────────────────────────────────┐
+│          HDFC BANK - Account Statement  │
+│  Name: Sourabh Kumar                    │
+│  Account No: 50100123456                │
+│  ┌──────────┬───────────────┬─────────┐ │
+│  │ Date     │ Description   │ Amount  │ │
+│  │ 01-09-26 │ Salary        │ 50,000  │ │
+│  │ 05-09-26 │ Rent          │ -15,000 │ │
+│  └──────────┴───────────────┴─────────┘ │
+│  Closing Balance: 35,000                │
+└─────────────────────────────────────────┘</code></pre>
+      <p>What comes out:</p>
+      <pre><code>file_ = [
+  "\n--- Page 1 ---\nHDFC BANK - Account Statement\nName: Sourabh Kumar\nAccount No: 50100123456\nDate Description Amount\n01-09-26 Salary 50,000\n05-09-26 Rent -15,000\nClosing Balance: 35,000"
+]
+tables = [ ...the table as rows... ]    # found, never used by the Vault</code></pre>
+      <p>A list with one item per page. The table's words survive, but as plain lines with spaces: the boxes and columns are gone.</p>
+
+      <h2 id="worker">Back in the worker</h2>
+      <pre><code>pages = [{"pageNumber": i + 1, "content": text} for i, text in enumerate(file_)]
+successfulPages = [p for p in pages if p.get("content", "").strip()]
+if not successfulPages:
+    raise ValueError("OCR returned no content from any page.")</code></pre>
+      <ol>
+        <li>Number the pages: <code>[{"pageNumber": 1, "content": "..."}]</code>. Keeping page numbers is how chat can later say "found on page 1".</li>
+        <li>Keep only pages with text.</li>
+        <li>If none are left, fail the file.</li>
+        <li>Log "✓ OCR complete: 1/1 page(s) extracted successfully."</li>
+      </ol>
+      <p>This list goes to <code>indexDocument</code> (Lesson 6).</p>
+      <p>There's also an <code>if holdingType == "pms"</code> branch that calls <code>localOcr</code> instead. It never runs in the Vault, because <code>holdingType</code> is never fetched. It was copied in from the same pattern used in <code>/ocr</code> and <code>docVaultLlm.getDocumentSummary</code>.</p>
+
+      <h2 id="holdings">How asset-holdings uploads differ</h2>
+      <p>
+        The asset-holdings upload (<code>POST /upload_pdf_nocron</code> in <code>routes/fileRoutes.py</code>)
+        extracts transactions a completely different way: it turns every page into an
+        <strong>image</strong> and sends the images to Gemini with document-specific instructions
+        (PMS, AIF, contract note, dividend statement). PDFs over 5 pages are queued for later.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Doc Vault</th><th>Asset-holdings upload</th></tr></thead>
+          <tbody>
+            <tr><td>How it reads the PDF</td><td>Stored text (pdfplumber)</td><td>Page images (Gemini vision)</td></tr>
+            <tr><td>Scanned PDFs</td><td class="no">Don't work</td><td class="yes">Work</td></tr>
+            <tr><td>Cost</td><td>Free</td><td>Paid per Gemini call</td></tr>
+            <tr><td>Output</td><td>Plain text, for chat</td><td>Structured transactions (JSON)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The old text-plus-tables method for holdings is commented out, so right now nobody uses Camelot's tables. They're leftover work.</p>
+
+      <h2 id="limits">Limits and bugs</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>PDF type</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td>All text</td><td class="yes">All text extracted</td></tr>
+            <tr><td>Text + images (logo, chart, a screenshot of a table)</td><td class="maybe">Text extracted; anything inside images is silently lost</td></tr>
+            <tr><td>Fully scanned</td><td class="no">Nothing real extracted, yet marked "completed" (see below)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout edge">
+        <span class="callout-title">Bugs found here</span>
+        <ul>
+          <li><strong>Scanned PDFs are marked "completed".</strong> Every page gets the label <code>--- Page N ---</code>, even when its text is empty. So "empty" pages never look empty, the "no content" check never triggers, and the file is indexed as chunks containing only labels. Chat then says "couldn't find that" with no hint the file was unreadable.</li>
+          <li><strong>Page numbers shift.</strong> Pages with "Annexure A" are skipped, but page numbers are assigned by position in the list. Skip page 3 and the real page 4 is labelled "page 3"; chat references point to the wrong page.</li>
+          <li><strong>Unlocked copies are never deleted.</strong> Each password-protected PDF leaves an unlocked copy on the server's disk: a privacy and disk-space problem. (Not hit by the Vault today, since the password is always empty.)</li>
+          <li><strong>Wasted work.</strong> Camelot scans every page twice, the slowest part, and the Vault throws the result away. Each page's text is also extracted twice.</li>
+          <li><strong>2-column tables dropped.</strong> The comment says single-column tables are ignored; the code drops 2-column ones (like <code>Name | Value</code>) too.</li>
+          <li><strong>"Annexure A" pages are always skipped</strong>, which looks like a rule copied from the loan-form feature. A Vault user asking about Annexure A gets nothing.</li>
+        </ul>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="04-the-background-worker.html"><small>← Previous</small><span>The background worker</span></a>
+        <a class="next" href="06-chunking.html"><small>Next →</small><span>Chunking</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>

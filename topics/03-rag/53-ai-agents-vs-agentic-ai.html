@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Agents vs Agentic AI</title>
+  <meta name="description" content="The difference between an AI agent (a single program doing one task with limited autonomy) and agentic AI (a network of agents collaborating towards a larger goal), with examples of each.">
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="../../index.html">Learning Notes</a>
+    <span class="crumb">/ <a href="index.html">RAG Bootcamp</a></span>
+  </header>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Chapter lessons">
+      <h4>RAG Bootcamp</h4>
+      <ol>
+        <li class="overview-item"><a class="overview" href="index.html">Chapter overview</a></li>
+        <li class="overview-item"><a class="overview" href="background-concepts.html">Background concepts</a></li>
+        <li><a href="01-introduction-to-rag.html">Why RAG: the problem with LLMs</a></li>
+        <li><a href="02-examples-and-advantages.html">How RAG works</a></li>
+        <li><a href="03-business-impact.html">RAG in the real world</a></li>
+        <li><a href="04-prompt-engineering-vs-fine-tuning-vs-rag.html">Prompt engineering vs fine-tuning vs RAG</a></li>
+        <li><a href="05-data-ingestion-and-preprocessing.html">Data ingestion and preprocessing</a></li>
+        <li><a href="06-query-processing-and-generation.html">Query processing and generation</a></li>
+        <li><a href="07-tools-and-section-overview.html">The ingestion toolkit</a></li>
+        <li><a href="08-langchain-document-structure.html">LangChain document structure</a></li>
+        <li><a href="09-loading-text-files.html">Loading text files</a></li>
+        <li><a href="10-text-splitting.html">Text splitting</a></li>
+        <li><a href="11-loading-pdf-files.html">Loading PDF files</a></li>
+        <li><a href="12-handling-pdf-issues.html">Handling PDF issues</a></li>
+        <li><a href="13-loading-word-documents.html">Loading Word documents</a></li>
+        <li><a href="14-loading-csv-and-excel.html">Loading CSV and Excel</a></li>
+        <li><a href="15-loading-json.html">Loading JSON</a></li>
+        <li><a href="16-loading-sql-databases.html">Loading SQL databases</a></li>
+        <li><a href="17-introduction-to-embeddings-and-vector-databases.html">Embeddings and vector databases</a></li>
+        <li><a href="18-visualizing-embeddings-and-cosine-similarity.html">Visualizing embeddings and cosine similarity</a></li>
+        <li><a href="19-hugging-face-embeddings.html">Creating embeddings with Hugging Face</a></li>
+        <li><a href="20-openai-embeddings.html">OpenAI embeddings</a></li>
+        <li><a href="21-similarity-and-semantic-search.html">Similarity and semantic search</a></li>
+        <li><a href="22-vector-stores-vs-vector-databases.html">Vector stores vs vector databases</a></li>
+        <li><a href="23-chromadb-rag-part-1.html">RAG with ChromaDB, part 1: load, split, embed</a></li>
+        <li><a href="24-chromadb-rag-part-2.html">RAG with ChromaDB, part 2: store and search</a></li>
+        <li><a href="25-chromadb-rag-part-3.html">RAG with ChromaDB, part 3: the LLM and the retrieval chain</a></li>
+        <li><a href="26-rag-with-lcel.html">Building the RAG chain with LCEL</a></li>
+        <li><a href="27-adding-documents-to-a-vector-store.html">Adding new documents to a vector store</a></li>
+        <li><a href="28-conversational-memory.html">Conversational memory</a></li>
+        <li><a href="29-using-groq-llms.html">Using Groq LLMs</a></li>
+        <li><a href="30-faiss-rag-part-1.html">RAG with FAISS, part 1: the vector store</a></li>
+        <li><a href="31-faiss-rag-part-2.html">RAG with FAISS, part 2: three RAG chains</a></li>
+        <li><a href="32-inmemory-vector-store.html">InMemoryVectorStore</a></li>
+        <li><a href="33-datastax-astra-db.html">DataStax Astra DB</a></li>
+        <li><a href="34-pinecone.html">Pinecone</a></li>
+        <li><a href="35-semantic-chunking.html">Semantic chunking</a></li>
+        <li><a href="36-semantic-chunking-in-python.html">Semantic chunking in Python</a></li>
+        <li><a href="37-rag-with-a-semantic-chunker.html">RAG pipeline with a semantic chunker</a></li>
+        <li><a href="38-semanticchunker-in-langchain.html">LangChain's SemanticChunker</a></li>
+        <li><a href="39-dense-and-sparse-retrieval.html">Hybrid search: dense and sparse retrieval</a></li>
+        <li><a href="40-hybrid-retriever-in-langchain.html">Hybrid retriever in LangChain</a></li>
+        <li><a href="41-benefits-of-hybrid-search.html">Benefits of hybrid search</a></li>
+        <li><a href="42-reranking.html">Reranking</a></li>
+        <li><a href="43-reranking-with-an-llm.html">Reranking with an LLM</a></li>
+        <li><a href="44-maximal-marginal-relevance.html">Maximal marginal relevance (MMR)</a></li>
+        <li><a href="45-mmr-retriever.html">MMR retriever in LangChain</a></li>
+        <li><a href="46-when-to-use-mmr.html">When to use MMR</a></li>
+        <li><a href="47-query-expansion.html">Query expansion</a></li>
+        <li><a href="48-query-expansion-in-code.html">Query expansion in code</a></li>
+        <li><a href="49-query-decomposition.html">Query decomposition</a></li>
+        <li><a href="50-hyde.html">HyDE: hypothetical document embeddings</a></li>
+        <li><a href="51-multimodal-rag.html">Multimodal RAG</a></li>
+        <li><a href="52-multimodal-rag-in-code.html">Multimodal RAG in code</a></li>
+        <li><a href="53-ai-agents-vs-agentic-ai.html" aria-current="page">AI agents vs agentic AI</a></li>
+        <li><a href="54-agentic-ai-software-team-example.html">Agentic AI example: a software team</a></li>
+        <li><a href="55-langchain-v1-create-agent.html">LangChain v1: creating agents</a></li>
+        <li><a href="56-invoke-stream-batch.html">Invoke, stream and batch</a></li>
+        <li><a href="57-tools-in-langchain.html">Tools in LangChain</a></li>
+        <li><a href="58-message-types.html">Message types</a></li>
+        <li><a href="59-structured-output-pydantic.html">Structured output with Pydantic</a></li>
+        <li><a href="60-structured-output-typeddict.html">Structured output with TypedDict</a></li>
+        <li><a href="61-structured-output-dataclasses.html">Structured output with dataclasses and agents</a></li>
+        <li><a href="62-middleware-summarization.html">Middleware and summarization</a></li>
+        <li><a href="63-human-in-the-loop-middleware.html">Human-in-the-loop middleware</a></li>
+      </ol>
+    </nav>
+
+    <main class="content">
+      <p class="eyebrow">Section 10 · Lesson 53</p>
+      <h1>AI Agents vs Agentic AI</h1>
+
+      <p class="lead">
+        Two terms used for the rest of the course. An <strong>AI agent</strong> is one program doing
+        one job. <strong>Agentic AI</strong> is a system of many agents working together on a
+        bigger goal.
+      </p>
+
+      <h2 id="definitions">Definitions</h2>
+      <div class="split">
+        <div>
+          <h4>AI agent</h4>
+          <p>An individual program that performs a <strong>specific task</strong> with some autonomy (no human needed for that task), following <strong>predefined rules</strong>.</p>
+        </div>
+        <div>
+          <h4>Agentic AI</h4>
+          <p>A system where <strong>multiple agents collaborate</strong> and make decisions independently towards a larger goal, adapting to real-time data and learning from experience.</p>
+        </div>
+      </div>
+      <figure class="figure">
+        <div class="scroll">
+          <svg viewBox="0 0 760 210" role="img" aria-label="Left: a single AI agent takes an input, performs one task such as looking something up in a database, and returns a response. Right: in agentic AI, several agents (lights, thermostat, appliances) are connected to each other and work towards a shared goal: reduce electricity.">
+            <defs>
+              <marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10z" class="d-head"/>
+              </marker>
+            </defs>
+            <text x="0" y="18" class="d-text d-label-accent">AI agent: one task</text>
+            <rect x="0" y="80" width="80" height="44" rx="8" class="d-box"/>
+            <text x="40" y="107" text-anchor="middle" class="d-small">input</text>
+            <line x1="80" y1="102" x2="118" y2="102" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="120" y="74" width="110" height="56" rx="8" class="d-box accent"/>
+            <text x="175" y="98" text-anchor="middle" class="d-small">agent</text>
+            <text x="175" y="116" text-anchor="middle" class="d-muted">LLM + database</text>
+            <line x1="230" y1="102" x2="268" y2="102" class="d-line" marker-end="url(#ah1)"/>
+            <rect x="270" y="80" width="90" height="44" rx="8" class="d-box ok"/>
+            <text x="315" y="107" text-anchor="middle" class="d-small">response</text>
+
+            <text x="420" y="18" class="d-text d-label-ok">Agentic AI: a network of agents</text>
+            <rect x="420" y="50" width="110" height="44" rx="8" class="d-box accent"/>
+            <text x="475" y="77" text-anchor="middle" class="d-small">lights agent</text>
+            <rect x="640" y="50" width="120" height="44" rx="8" class="d-box accent"/>
+            <text x="700" y="77" text-anchor="middle" class="d-small">thermostat agent</text>
+            <rect x="525" y="130" width="130" height="44" rx="8" class="d-box accent"/>
+            <text x="590" y="157" text-anchor="middle" class="d-small">appliances agent</text>
+            <line x1="530" y1="72" x2="638" y2="72" class="d-line" marker-start="url(#ah1)" marker-end="url(#ah1)"/>
+            <line x1="490" y1="94" x2="555" y2="128" class="d-line" marker-start="url(#ah1)" marker-end="url(#ah1)"/>
+            <line x1="690" y1="94" x2="625" y2="128" class="d-line" marker-start="url(#ah1)" marker-end="url(#ah1)"/>
+            <text x="590" y="200" text-anchor="middle" class="d-muted">shared goal: reduce electricity</text>
+          </svg>
+        </div>
+        <figcaption>One agent, one job; versus several agents communicating towards one goal.</figcaption>
+      </figure>
+      <p>(The <a href="background-concepts.html#agentic" title="Background concepts">background entry</a> describes an agent more loosely, as an LLM that picks its own next step; the course uses "agentic AI" for multi-agent systems.)</p>
+
+      <h2 id="differences">Key differences</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>AI agent</th><th>Agentic AI</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Scope</strong></td><td>One specific task, limited autonomy</td><td>The whole system; learns, adapts, makes complex decisions</td></tr>
+            <tr><td><strong>Decisions</strong></td><td>Predefined rules</td><td>Autonomous, based on real-time data</td></tr>
+            <tr><td><strong>In short</strong></td><td>A single entity</td><td>A network of agents with a shared goal</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="examples">Examples</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Example</th><th>Type</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Customer service chatbot</strong>: "When is my order arriving?" → looks it up in the company database → answers</td><td>AI agent</td><td>One function. In LLM terms: an LLM plus a database acting as a retriever, the same idea as RAG.</td></tr>
+            <tr><td><strong>Banking bots</strong>: balances, transactions, opening accounts</td><td>AI agent</td><td>Clearly defined processes, one agent per task.</td></tr>
+            <tr><td><strong>Smart home</strong>: agents for lights, thermostat and appliances, with the goal of saving electricity</td><td>Agentic AI</td><td>They coordinate based on the environment, e.g. lights off when nobody's in the room.</td></tr>
+            <tr><td><strong>Personalised health assistant</strong>: medical history, live health data, lifestyle</td><td>Agentic AI</td><td>Goal-driven, adapts to new research and patient feedback.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>An agentic system's decisions follow four steps:</p>
+      <ol class="steps">
+        <li><span class="step-title">Perceive</span><span class="step-body">Gather data from the surroundings.</span></li>
+        <li><span class="step-title">Reason</span><span class="step-body">Work out what's going on.</span></li>
+        <li><span class="step-title">Act</span><span class="step-body">E.g. switch off the lights.</span></li>
+        <li><span class="step-title">Learn</span><span class="step-body">Improve over time (e.g. <a href="background-concepts.html#reinforcement-learning" title="Background concepts">reinforcement learning</a>).</span></li>
+      </ol>
+      <p class="keyidea">In the agents the course builds with <a href="background-concepts.html#langgraph" title="Background concepts">LangGraph</a>, an LLM is the brain: it decides what to do, and uses tools and databases to do it.</p>
+
+      <h2 id="takeaways">Takeaways</h2>
+      <ul>
+        <li><strong>AI agent</strong>: one task, predefined rules.</li>
+        <li><strong>Agentic AI</strong>: many agents, one goal, adaptive decisions (perceive → reason → act → learn).</li>
+      </ul>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="52-multimodal-rag-in-code.html"><small>← Previous</small><span>Multimodal RAG in code</span></a>
+        <a class="next" href="54-agentic-ai-software-team-example.html"><small>Next →</small><span>Agentic AI example: a software team</span></a>
+      </nav>
+    </main>
+  </div>
+
+</body>
+</html>
